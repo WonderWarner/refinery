@@ -52,6 +52,7 @@ junit4 = "4.13.2"
 logback = "1.5.18"
 lsp4j = "0.24.0"
 mockito = "5.17.0"
+moea = "5.0"
 mwe = "1.15.0"
 mwe2 = "2.21.0"
 opentest4j = "1.3.0"
@@ -134,6 +135,7 @@ lsp4j = { group = "org.eclipse.lsp4j", name = "org.eclipse.lsp4j", version.ref =
 lsp4j-jsonrpc = { group = "org.eclipse.lsp4j", name = "org.eclipse.lsp4j.jsonrpc", version.ref = "lsp4j" }
 mockito-core = { group = "org.mockito", name = "mockito-core", version.ref = "mockito" }
 mockito-junit = { group = "org.mockito", name = "mockito-junit-jupiter", version.ref = "mockito" }
+moea = { group = "org.moeaframework", name = "moeaframework", version.ref = "moea" }
 mwe-core = { group = "org.eclipse.emf", name = "org.eclipse.emf.mwe.core", version.ref = "mwe" }
 mwe-utils = { group = "org.eclipse.emf", name = "org.eclipse.emf.mwe.utils", version.ref = "mwe" }
 mwe2-language = { group = "org.eclipse.emf", name = "org.eclipse.emf.mwe2.language", version.ref = "mwe2" }

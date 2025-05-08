@@ -24,6 +24,7 @@
          <trusted-key id="0B743A794876D3C78AB542A118D239B1CBCD2236" group="^org[.]glassfish[.]jersey($|([.].*))" regex="true"/>
          <trusted-key id="147B691A19097624902F4EA9689CBE64F4BC997F" group="org.mockito"/>
          <trusted-key id="1A55F091AD28C07F831FA44D7905DE25C78AD456" group="com.google.protobuf" name="protobuf-java"/>
+         <trusted-key id="1A6782E4EBF49045C8040D1B93157E22A3A5461C" group="org.jfree" name="jfreechart"/>
          <trusted-key id="1BD97A6A154E7810EE0BC832E2F38302C8075E3D">
             <trusting group="com.gradle.publish" name="plugin-publish-plugin"/>
             <trusting group="org.gradle.kotlin" name="gradle-kotlin-dsl-plugins"/>
@@ -83,6 +84,7 @@
          <trusted-key id="B02137D875D833D9B23392ECAE5A7FB608A0221C" group="org.apache.maven" name="maven-model"/>
          <trusted-key id="B1F2BE13E5A4A4C4C836296D9098E9F3D6AFA0D7" group="org.eclipse.emf"/>
          <trusted-key id="B2460AF072132DD71CD98A63020BDA623C651E0E" group="io.github.goooler.shadow" name="shadow-gradle-plugin"/>
+         <trusted-key id="B89C2ED38A555A879C16B71D9F0C4840E3E374B3" group="org.jfree" name="jcommon"/>
          <trusted-key id="BA3DD700481F03C9879973EAE2C9782DF41D39C0" group="^tools[.]refinery($|([.].*))" regex="true"/>
          <trusted-key id="BB785E0400E71390977E4D1ADF3CC7C64D56297B" group="jakarta.interceptor" name="jakarta.interceptor-api"/>
          <trusted-key id="BD7A06A58793C8CD6B23F29C48649310781A80FB" group="org.eclipse.lsp4j"/>
@@ -92,6 +94,7 @@
          <trusted-key id="D4A77129F00F736293BE5A51AFC18A2271EDDFE1" group="^org[.]glassfish[.]hk2($|([.].*))" regex="true"/>
          <trusted-key id="D9905D77178BAC979B03C462E46D9A6A3624B8E3" group="org.eclipse.collections"/>
          <trusted-key id="DBD744ACE7ADE6AA50DD591F66B50994442D2D40" group="^com[.]squareup($|([.].*))" regex="true"/>
+         <trusted-key id="DE2175C1F058E4E22BFB607A04FB5FFC82AEDF3A" group="org.moeaframework"/>
          <trusted-key id="E0DF8DDCD695442C46416B55F487014CA998E9AF">
             <trusting group="org.eclipse.xtext" name="xtext-antlr-generator"/>
             <trusting group="org.xtext" name="antlr-generator"/>
