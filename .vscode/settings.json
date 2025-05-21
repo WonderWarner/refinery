@@ -1,0 +1,19 @@
+/*
+ * SPDX-FileCopyrightText: 2021-2023 The Refinery Authors
+ *
+ * SPDX-License-Identifier: CC0-1.0
+ */
+{
+  "eslint.nodePath": ".yarn/sdks",
+  "prettier.prettierPath": ".yarn/sdks/prettier/index.cjs",
+  "search.exclude": {
+    "**/.yarn": true,
+    "**/.pnp.*": true
+  },
+  "sonarlint.connectedMode.project": {
+    "connectionId": "graphs4value",
+    "projectKey": "graphs4value_refinery"
+  },
+  "typescript.tsdk": ".yarn/sdks/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true
+}

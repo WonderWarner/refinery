@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<genmodel:GenModel xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ecore="http://www.eclipse.org/emf/2002/Ecore" xmlns:genmodel="http://www.eclipse.org/emf/2002/GenModel"
+    modelDirectory="/tools.refinery.refinery-language-model/src/main/emf-gen"
+    creationIcons="false" editDirectory="/toosl.refinery.language.model.edit/src/main/emf-gen" editorDirectory="/tools.refinery.language.model.editor/src-gen"
+    modelPluginID="language-model" modelName="Problem" rootExtendsClass="tools.refinery.language.model.problem.impl.ProblemEObjectImpl"
+    codeFormatting="true" importerID="org.eclipse.emf.importer.ecore" complianceLevel="5.0"
+    copyrightFields="false" operationReflection="true" importOrganizing="true">
+  <foreignModel>problem.ecore</foreignModel>
+  <testsDirectory xsi:nil="true"/>
+  <genPackages prefix="Problem" basePackage="tools.refinery.language.model" resource="XMI"
+      disposableProviderFactory="true" fileExtensions="problem_xmi" ecorePackage="problem.ecore#/">
+    <genEnums typeSafeEnumCompatible="false" ecoreEnum="problem.ecore#//LogicValue">
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//LogicValue/TRUE"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//LogicValue/FALSE"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//LogicValue/UNKNOWN"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//LogicValue/ERROR"/>
+    </genEnums>
+    <genEnums typeSafeEnumCompatible="false" ecoreEnum="problem.ecore#//ComparisonOp">
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//ComparisonOp/LESS"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//ComparisonOp/LESS_EQ"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//ComparisonOp/GREATER"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//ComparisonOp/GREATER_EQ"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//ComparisonOp/EQ"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//ComparisonOp/NOT_EQ"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//ComparisonOp/IN"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//ComparisonOp/NODE_EQ"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//ComparisonOp/NODE_NOT_EQ"/>
+    </genEnums>
+    <genEnums typeSafeEnumCompatible="false" ecoreEnum="problem.ecore#//ReferenceKind">
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//ReferenceKind/DEFAULT"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//ReferenceKind/REFERENCE"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//ReferenceKind/CONTAINMENT"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//ReferenceKind/CONTAINER"/>
+    </genEnums>
+    <genEnums typeSafeEnumCompatible="false" ecoreEnum="problem.ecore#//UnaryOp">
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//UnaryOp/PLUS"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//UnaryOp/MINUS"/>
+    </genEnums>
+    <genEnums typeSafeEnumCompatible="false" ecoreEnum="problem.ecore#//BinaryOp">
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//BinaryOp/ADD"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//BinaryOp/SUB"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//BinaryOp/MUL"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//BinaryOp/DIV"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//BinaryOp/POW"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//BinaryOp/AND"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//BinaryOp/OR"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//BinaryOp/XOR"/>
+    </genEnums>
+    <genEnums typeSafeEnumCompatible="false" ecoreEnum="problem.ecore#//ModuleKind">
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//ModuleKind/PROBLEM"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//ModuleKind/MODULE"/>
+    </genEnums>
+    <genEnums typeSafeEnumCompatible="false" ecoreEnum="problem.ecore#//NodeKind">
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//NodeKind/NODE"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//NodeKind/ATOM"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//NodeKind/MULTI"/>
+    </genEnums>
+    <genEnums typeSafeEnumCompatible="false" ecoreEnum="problem.ecore#//LatticeBinaryOp">
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//LatticeBinaryOp/MEET"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//LatticeBinaryOp/JOIN"/>
+    </genEnums>
+    <genEnums typeSafeEnumCompatible="false" ecoreEnum="problem.ecore#//Modality">
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//Modality/UNSPECIFIED"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//Modality/MUST"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//Modality/MAY"/>
+    </genEnums>
+    <genEnums typeSafeEnumCompatible="false" ecoreEnum="problem.ecore#//Concreteness">
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//Concreteness/UNSPECIFIED"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//Concreteness/PARTIAL"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//Concreteness/CANDIDATE"/>
+    </genEnums>
+    <genEnums typeSafeEnumCompatible="false" ecoreEnum="problem.ecore#//RuleKind">
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//RuleKind/REFINEMENT"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//RuleKind/PROPAGATION"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//RuleKind/DECISION"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//RuleKind/CONCRETIZATION"/>
+    </genEnums>
+    <genEnums typeSafeEnumCompatible="false" ecoreEnum="problem.ecore#//PredicateKind">
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//PredicateKind/DEFAULT"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//PredicateKind/ERROR"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//PredicateKind/SHADOW"/>
+    </genEnums>
+    <genEnums typeSafeEnumCompatible="false" ecoreEnum="problem.ecore#//ParameterKind">
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//ParameterKind/VALUE"/>
+      <genEnumLiterals ecoreEnumLiteral="problem.ecore#//ParameterKind/PRED"/>
+    </genEnums>
+    <genClasses ecoreClass="problem.ecore#//Problem">
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference problem.ecore#//Problem/nodes"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference problem.ecore#//Problem/statements"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute problem.ecore#//Problem/kind"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute problem.ecore#//Problem/explicitKind"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//ClassDeclaration">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute problem.ecore#//ClassDeclaration/abstract"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference problem.ecore#//ClassDeclaration/featureDeclarations"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference problem.ecore#//ClassDeclaration/newNode"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference problem.ecore#//ClassDeclaration/superTypes"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//ReferenceDeclaration">
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference problem.ecore#//ReferenceDeclaration/opposite"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference problem.ecore#//ReferenceDeclaration/multiplicity"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute problem.ecore#//ReferenceDeclaration/kind"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference problem.ecore#//ReferenceDeclaration/referenceType"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference problem.ecore#//ReferenceDeclaration/invalidMultiplicity"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference problem.ecore#//ReferenceDeclaration/superSets"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//NamedElement">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute problem.ecore#//NamedElement/name"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//PredicateDefinition">
+      <genFeatures children="true" createChild="true" propertySortChoices="true" ecoreFeature="ecore:EReference problem.ecore#//PredicateDefinition/bodies"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute problem.ecore#//PredicateDefinition/kind"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference problem.ecore#//PredicateDefinition/computedValue"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference problem.ecore#//PredicateDefinition/superSets"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//Parameter">
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference problem.ecore#//Parameter/parameterType"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute problem.ecore#//Parameter/kind"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//Variable"/>
+    <genClasses ecoreClass="problem.ecore#//Atom">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute problem.ecore#//Atom/transitiveClosure"/>
+      <genFeatures children="true" createChild="true" propertySortChoices="true" ecoreFeature="ecore:EReference problem.ecore#//Atom/arguments"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference problem.ecore#//Atom/relation"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//ImplicitVariable"/>
+    <genClasses ecoreClass="problem.ecore#//ExistentialQuantifier">
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference problem.ecore#//ExistentialQuantifier/implicitVariables"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//AbstractAssertion">
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference problem.ecore#//AbstractAssertion/arguments"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference problem.ecore#//AbstractAssertion/relation"/>
+      <genFeatures children="true" createChild="true" propertySortChoices="true" ecoreFeature="ecore:EReference problem.ecore#//AbstractAssertion/value"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//Node"/>
+    <genClasses ecoreClass="problem.ecore#//ScopeDeclaration">
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference problem.ecore#//ScopeDeclaration/typeScopes"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//Statement"/>
+    <genClasses ecoreClass="problem.ecore#//TypeScope">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute problem.ecore#//TypeScope/increment"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference problem.ecore#//TypeScope/multiplicity"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference problem.ecore#//TypeScope/targetType"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//Multiplicity"/>
+    <genClasses ecoreClass="problem.ecore#//RangeMultiplicity">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute problem.ecore#//RangeMultiplicity/lowerBound"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute problem.ecore#//RangeMultiplicity/upperBound"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//ExactMultiplicity">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute problem.ecore#//ExactMultiplicity/exactValue"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//UnboundedMultiplicity"/>
+    <genClasses ecoreClass="problem.ecore#//EnumDeclaration">
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference problem.ecore#//EnumDeclaration/literals"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//VariableOrNode"/>
+    <genClasses ecoreClass="problem.ecore#//Constant"/>
+    <genClasses ecoreClass="problem.ecore#//IntConstant">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute problem.ecore#//IntConstant/intValue"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//RealConstant">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute problem.ecore#//RealConstant/realValue"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//StringConstant">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute problem.ecore#//StringConstant/stringValue"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//NodeAssertionArgument">
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference problem.ecore#//NodeAssertionArgument/node"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//AssertionArgument"/>
+    <genClasses ecoreClass="problem.ecore#//NodeDeclaration">
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference problem.ecore#//NodeDeclaration/nodes"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute problem.ecore#//NodeDeclaration/kind"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//WildcardAssertionArgument"/>
+    <genClasses ecoreClass="problem.ecore#//ParametricDefinition">
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference problem.ecore#//ParametricDefinition/parameters"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//RuleDefinition">
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference problem.ecore#//RuleDefinition/consequents"/>
+      <genFeatures children="true" createChild="true" propertySortChoices="true" ecoreFeature="ecore:EReference problem.ecore#//RuleDefinition/preconditions"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute problem.ecore#//RuleDefinition/kind"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//Consequent">
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference problem.ecore#//Consequent/actions"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//Action"/>
+    <genClasses ecoreClass="problem.ecore#//AssertionAction"/>
+    <genClasses ecoreClass="problem.ecore#//Expr"/>
+    <genClasses ecoreClass="problem.ecore#//VariableOrNodeExpr">
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference problem.ecore#//VariableOrNodeExpr/variableOrNode"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference problem.ecore#//VariableOrNodeExpr/singletonVariable"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference problem.ecore#//VariableOrNodeExpr/relation"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference problem.ecore#//VariableOrNodeExpr/element"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//BinaryExpr">
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference problem.ecore#//BinaryExpr/left"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference problem.ecore#//BinaryExpr/right"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//UnaryExpr">
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference problem.ecore#//UnaryExpr/body"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//ArithmeticUnaryExpr">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute problem.ecore#//ArithmeticUnaryExpr/op"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//AggregationExpr">
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference problem.ecore#//AggregationExpr/value"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference problem.ecore#//AggregationExpr/condition"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference problem.ecore#//AggregationExpr/aggregator"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//ComparisonExpr">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute problem.ecore#//ComparisonExpr/op"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//QuantifiedUnaryExpr"/>
+    <genClasses ecoreClass="problem.ecore#//FunctionDefinition">
+      <genFeatures children="true" createChild="true" propertySortChoices="true" ecoreFeature="ecore:EReference problem.ecore#//FunctionDefinition/cases"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference problem.ecore#//FunctionDefinition/functionType"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//Case"/>
+    <genClasses ecoreClass="problem.ecore#//Conjunction">
+      <genFeatures children="true" createChild="true" propertySortChoices="true" ecoreFeature="ecore:EReference problem.ecore#//Conjunction/literals"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//Match">
+      <genFeatures children="true" createChild="true" propertySortChoices="true" ecoreFeature="ecore:EReference problem.ecore#//Match/condition"/>
+      <genFeatures children="true" createChild="true" propertySortChoices="true" ecoreFeature="ecore:EReference problem.ecore#//Match/value"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//ArithmeticBinaryExpr">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute problem.ecore#//ArithmeticBinaryExpr/op"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//NegationExpr"/>
+    <genClasses ecoreClass="problem.ecore#//CountExpr"/>
+    <genClasses ecoreClass="problem.ecore#//Relation"/>
+    <genClasses ecoreClass="problem.ecore#//RangeExpr"/>
+    <genClasses ecoreClass="problem.ecore#//LogicConstant">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute problem.ecore#//LogicConstant/logicValue"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//ImportStatement">
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference problem.ecore#//ImportStatement/importedModule"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute problem.ecore#//ImportStatement/alias"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//DatatypeDeclaration"/>
+    <genClasses ecoreClass="problem.ecore#//LatticeBinaryExpr">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute problem.ecore#//LatticeBinaryExpr/op"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//CastExpr">
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference problem.ecore#//CastExpr/body"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference problem.ecore#//CastExpr/targetType"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//AssignmentExpr"/>
+    <genClasses ecoreClass="problem.ecore#//InfiniteConstant"/>
+    <genClasses ecoreClass="problem.ecore#//AggregatorDeclaration"/>
+    <genClasses ecoreClass="problem.ecore#//ModalExpr">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute problem.ecore#//ModalExpr/concreteness"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute problem.ecore#//ModalExpr/modality"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//Assertion">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute problem.ecore#//Assertion/default"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//AnnotatedElement">
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference problem.ecore#//AnnotatedElement/annotations"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//AnnotationContainer">
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference problem.ecore#//AnnotationContainer/annotations"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//AnnotationDeclaration"/>
+    <genClasses ecoreClass="problem.ecore#//Annotation">
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference problem.ecore#//Annotation/declaration"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference problem.ecore#//Annotation/arguments"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//AnnotationArgument">
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference problem.ecore#//AnnotationArgument/value"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference problem.ecore#//AnnotationArgument/parameter"/>
+    </genClasses>
+    <genClasses ecoreClass="problem.ecore#//TopLevelAnnotation">
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference problem.ecore#//TopLevelAnnotation/annotation"/>
+    </genClasses>
+  </genPackages>
+</genmodel:GenModel>

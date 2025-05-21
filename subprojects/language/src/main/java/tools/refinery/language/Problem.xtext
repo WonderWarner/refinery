@@ -1,0 +1,358 @@
+/*
+ * SPDX-FileCopyrightText: 2021-2024 The Refinery Authors <https://refinery.tools/>
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ */
+grammar tools.refinery.language.Problem with org.eclipse.xtext.common.Terminals
+
+import "http://www.eclipse.org/emf/2002/Ecore" as ecore
+import "https://refinery.tools/emf/2021/Problem"
+
+Problem:
+	(kind=ModuleKind name=QualifiedName? ".")?
+	statements+=Statement*;
+
+enum ModuleKind:
+	PROBLEM="problem" | MODULE="module";
+
+Statement:
+	ImportStatement | Assertion | AnnotatedStatement | ScopeDeclaration | TopLevelAnnotation;
+
+AnnotatedStatement returns Statement:
+	AnnotationContainer
+	(
+		{ClassDeclaration.annotations=current}
+		abstract?="abstract"? "class"
+		name=Identifier
+		("extends" superTypes+=[Relation|QualifiedName] ("," superTypes+=[Relation|QualifiedName])*)?
+		("{" (featureDeclarations+=ReferenceDeclaration ";"?)* "}" | ".")
+	|
+		{EnumDeclaration.annotations=current}
+		"enum"
+		name=Identifier
+		("{" (literals+=EnumLiteral ("," literals+=EnumLiteral)* ("," | ";")?)? "}" | ".")
+	|
+		{DatatypeDeclaration.annotations=current}
+		"extern" "datatype" name=Identifier "."
+	|
+		{AggregatorDeclaration.annotations=current}
+		"extern" "aggregator" name=Identifier "."
+	|
+		{PredicateDefinition.annotations=current}
+		(kind=ErrorPredicateKind | kind=PredicateKind? "pred")
+		name=Identifier
+		"(" (parameters+=Parameter ("," parameters+=Parameter)*)? ")"
+		("subsets" superSets+=[ReferenceDeclaration|QualifiedName]
+			("," superSets+=[ReferenceDeclaration|QualifiedName])*
+		)?
+		("<->" bodies+=Conjunction (";" bodies+=Conjunction)*)?
+		"."
+	|
+		{RuleDefinition.annotations=current}
+		kind=RuleKind? "rule"
+		name=Identifier
+		"(" (parameters+=Parameter ("," parameters+=Parameter)*)? ")"
+		("<->" preconditions+=Conjunction (";" preconditions+=Conjunction)*)?
+		("==>" consequents+=Consequent (";" consequents+=Consequent)*)?
+		"."
+	|
+		{AnnotationDeclaration.annotations=current}
+		"#" "pred" name=Identifier
+		"(" (parameters+=Parameter ("," parameters+=Parameter)*)? ")" "."
+	|
+		{NodeDeclaration.annotations=current}
+		("declare" | "declare"? kind=NodeKind)
+		nodes+=EnumLiteral ("," nodes+=EnumLiteral)* "."
+	);
+
+AnnotationContainer:
+	{AnnotationContainer} ("@" annotations+=Annotation)*;
+
+TopLevelAnnotation:
+	"#" annotation=Annotation ".";
+
+Annotation:
+	{Annotation} declaration=[AnnotationDeclaration|QualifiedName]
+	("(" (arguments+=AnnotationArgument ("," arguments+=AnnotationArgument)*)? ")")?;
+
+AnnotationArgument:
+	{AnnotationArgument} (parameter=[Parameter|Identifier] "=")? value=Expr;
+
+ImportStatement:
+	"import" importedModule=[Problem|QualifiedName] ("as" alias=ID)? ".";
+
+EnumLiteral returns Node:
+	annotations=AnnotationContainer
+	name=Identifier;
+
+enum ReferenceKind:
+	REFERENCE="refers" | CONTAINMENT="contains" | CONTAINER="container";
+
+ReferenceDeclaration:
+	annotations=AnnotationContainer
+	(referenceType=[Relation|NonContainmentQualifiedName] |
+	kind=ReferenceKind referenceType=[Relation|QualifiedName])
+	(multiplicity=ReferenceMultiplicity)?
+	name=Identifier
+	(("opposite" opposite=[ReferenceDeclaration|QualifiedName])? &
+	("subsets" superSets+=[ReferenceDeclaration|QualifiedName]
+		("," superSets+=[ReferenceDeclaration|QualifiedName])*
+	)?);
+
+ReferenceMultiplicity returns Multiplicity:
+	"[" Multiplicity "]";
+
+enum ErrorPredicateKind returns PredicateKind:
+	ERROR="error";
+
+enum PredicateKind:
+	ERROR="error" | SHADOW="shadow";
+
+Conjunction:
+	literals+=Expr ("," literals+=Expr)*;
+
+//FunctionDefinition:
+//	"fn" functionType=[DatatypeDefinition|QualifiedName] name=Identifier
+//	"(" (parameters+=Parameter ("," parameters+=Parameter)*)? ")"
+//	("=" cases+=Case (";" cases+=Case)*)?
+//	".";
+//
+//Case:
+//	Conjunction ({Match.condition=current} "->" value=Expr)?;
+
+enum RuleKind:
+	DECISION="decision" | PROPAGATION="propagation" | CONCRETIZATION="concretization";
+
+enum ParameterKind:
+	PRED="pred";
+
+Parameter:
+	annotations=AnnotationContainer
+	(kind=ParameterKind | parameterType=[Relation|QualifiedName])?
+	name=Identifier;
+
+Consequent:
+	actions+=Action ("," actions+=Action)*;
+
+Action:
+	AssertionAction;
+
+AssertionAction:
+	relation=[Relation|QualifiedName]
+	"(" (arguments+=AssertionArgument ("," arguments+=AssertionArgument)*)? ")"
+	":" value=Expr |
+	value=ShortLogicConstant
+	relation=[Relation|QualifiedName]
+	"(" (arguments+=AssertionArgument ("," arguments+=AssertionArgument)*)? ")";
+
+Expr:
+	AssignmentExpr;
+
+AssignmentExpr returns Expr:
+	BooleanExpr ({AssignmentExpr.left=current} "is" right=BooleanExpr)*;
+
+enum BooleanBinaryOp returns BinaryOp:
+	AND="&&" | OR="||" | XOR="^^";
+
+BooleanExpr returns Expr:
+	ComparisonExpr ({ArithmeticBinaryExpr.left=current}
+	op=BooleanBinaryOp right=ComparisonExpr)*;
+
+enum ComparisonOp:
+	LESS="<" | LESS_EQ="<=" | GREATER=">" | GREATER_EQ=">=" | EQ="===" | NOT_EQ="!==" |
+	IN="in" | NODE_EQ="==" | NODE_NOT_EQ="!=";
+
+ComparisonExpr returns Expr:
+	LatticeExpr ({ComparisonExpr.left=current}
+	op=ComparisonOp right=LatticeExpr)*;
+
+enum LatticeBinaryOp:
+	MEET="/\\" | JOIN="\\/";
+
+LatticeExpr returns Expr:
+	AdditiveExpr ({LatticeBinaryExpr.left=current}
+	op=LatticeBinaryOp right=AdditiveExpr)*;
+
+enum AdditiveOp returns BinaryOp:
+	ADD="+" | SUB="-";
+
+AdditiveExpr returns Expr:
+	MultiplicativeExpr ({ArithmeticBinaryExpr.left=current}
+	op=AdditiveOp right=MultiplicativeExpr)*;
+
+enum MultiplicativeOp returns BinaryOp:
+	MUL="*" | DIV="/";
+
+MultiplicativeExpr returns Expr:
+	ExponentialExpr ({ArithmeticBinaryExpr.left=current}
+	op=MultiplicativeOp right=ExponentialExpr)*;
+
+enum ExponentialOp returns BinaryOp:
+	POW="**";
+
+ExponentialExpr returns Expr:
+	RangeExpr ({ArithmeticBinaryExpr.left=current}
+	op=ExponentialOp right=ExponentialExpr)?;
+
+RangeExpr returns Expr:
+	UnaryExpr ({RangeExpr.left=current} ".." right=UnaryExpr)*;
+
+UnaryExpr returns Expr:
+	ArithmeticUnaryExpr | NegationExpr |
+	CountExpr | AggregationExpr | ModalExpr | CastExpr;
+
+enum UnaryOp:
+	PLUS="+" | MINUS="-";
+
+ArithmeticUnaryExpr:
+	op=UnaryOp body=UnaryExpr;
+
+NegationExpr:
+	"!" body=UnaryExpr;
+
+CountExpr:
+	"count" body=UnaryExpr;
+
+AggregationExpr:
+	aggregator=[AggregatorDeclaration|QualifiedName]
+	"{" value=Expr "|" condition=ComparisonExpr "}";
+
+enum Concreteness:
+	PARTIAL="partial" | CANDIDATE="candidate";
+
+enum Modality:
+	MUST="must" | MAY="may";
+
+ModalExpr:
+	(concreteness=Concreteness => modality=Modality? | modality=Modality => concreteness=Concreteness?)
+	body=UnaryExpr;
+
+CastExpr returns Expr:
+	CastExprBody ({CastExpr.body=current} "as" targetType=[Relation|QualifiedName])?;
+
+CastExprBody returns Expr:
+	Atom | VariableOrNodeExpr | Constant | "(" Expr ")";
+
+Atom:
+	relation=[Relation|QualifiedName]
+	transitiveClosure?=TRANSITIVE_CLOSURE?
+	"(" (arguments+=Expr ("," arguments+=Expr)*)? ")";
+
+VariableOrNodeExpr:
+	element=[NamedElement|QualifiedName];
+
+Constant:
+	RealConstant | IntConstant | StringConstant | InfiniteConstant | LogicConstant;
+
+IntConstant:
+	intValue=INT;
+
+RealConstant:
+	realValue=Real;
+
+StringConstant:
+	stringValue=STRING;
+
+InfiniteConstant:
+	{InfiniteConstant} "*";
+
+enum LogicValue:
+	TRUE="true" | FALSE="false" | UNKNOWN="unknown" | ERROR="error";
+
+LogicConstant:
+	logicValue=LogicValue;
+
+Assertion:
+	default?="default"?
+	(relation=[Relation|QualifiedName]
+	"(" (arguments+=AssertionArgument ("," arguments+=AssertionArgument)*)? ")"
+	":" value=Expr |
+	value=ShortLogicConstant
+	relation=[Relation|QualifiedName]
+	"(" (arguments+=AssertionArgument ("," arguments+=AssertionArgument)*)? ")")
+	".";
+
+AssertionArgument:
+	NodeAssertionArgument | WildcardAssertionArgument;
+
+NodeAssertionArgument:
+	node=[Node|QualifiedName];
+
+WildcardAssertionArgument:
+	{WildcardAssertionArgument} "*";
+
+enum ShortLogicValue returns LogicValue:
+	FALSE="!" | UNKNOWN="?";
+
+ShortLogicConstant returns LogicConstant:
+	{LogicConstant} logicValue=ShortLogicValue?;
+
+ScopeDeclaration:
+	"scope" typeScopes+=TypeScope ("," typeScopes+=TypeScope)* ".";
+
+TypeScope:
+	targetType=[Relation|QualifiedName]
+	(increment?="+=" | "=")
+	multiplicity=DefiniteMultiplicity;
+
+Multiplicity:
+	UnboundedMultiplicity | DefiniteMultiplicity;
+
+DefiniteMultiplicity returns Multiplicity:
+	RangeMultiplicity | ExactMultiplicity;
+
+UnboundedMultiplicity:
+	{UnboundedMultiplicity};
+
+RangeMultiplicity:
+	lowerBound=INT ".." upperBound=UpperBound;
+
+ExactMultiplicity:
+	exactValue=INT;
+
+enum NodeKind:
+	ATOM="atom" | MULTI="multi";
+
+UpperBound returns ecore::EInt:
+	INT | "*";
+
+QualifiedName hidden():
+	"::"? Identifier (QUALIFIED_NAME_SEPARATOR Identifier)*;
+
+NonContainmentQualifiedName hidden():
+	(NonContainmentIdentifier | "::" Identifier) (QUALIFIED_NAME_SEPARATOR Identifier)*;
+
+Identifier:
+	NonContainmentIdentifier | "contains" | "container" | "opposite" | "subsets";
+
+NonContainmentIdentifier:
+	ID | QUOTED_ID | "atom" | "multi" | "problem" | "module" |
+	"datatype" | "aggregator" | "decision" | "propagation" | "concretization" |
+	"shadow";
+
+Real returns ecore::EDouble:
+	EXPONENTIAL | INT "." (INT | EXPONENTIAL);
+
+terminal TRANSITIVE_CLOSURE:
+	"synthetic:TRANSITIVE_CLOSURE";
+
+terminal QUALIFIED_NAME_SEPARATOR:
+	"synthetic::QUALIFIED_NAME_SEPARATOR";
+
+@Override
+terminal ID:
+	('a'..'z' | 'A'..'Z' | '_') ('a'..'z' | 'A'..'Z' | '_' | '0'..'9')*;
+
+terminal EXPONENTIAL:
+	INT ("e" | "E") ("+" | "-")? INT;
+
+@Override
+terminal SL_COMMENT:
+	('%' | '//') !('\n' | '\r')* ('\r'? '\n')?;
+
+@Override
+terminal STRING:
+	'"' ( '\\' . /* 'b'|'t'|'n'|'f'|'r'|'u'|'"'|"'"|'\\' */ | !('\\'|'"') )* '"';
+
+terminal QUOTED_ID:
+	"'" ( '\\' . /* 'b'|'t'|'n'|'f'|'r'|'u'|'"'|"'"|'\\' */ | !('\\'|"'") )* "'";

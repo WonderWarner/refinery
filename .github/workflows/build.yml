@@ -1,0 +1,210 @@
+# SPDX-FileCopyrightText: 2021-2025 The Refinery Authors
+#
+# SPDX-License-Identifier: EPL-2.0
+
+name: Build
+on:
+  push:
+    branches:
+      - '**'
+      - '!gh-pages'
+  pull_request:
+    types: [opened, synchronize, reopened]
+jobs:
+  build:
+    name: Build
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        os:
+          - ubuntu-24.04
+          - ubuntu-22.04
+          - windows-2022
+          - macos-13 # Intel
+          - macos-14 # ARM
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check for Sonar secret
+        id: check-secret
+        if: ${{ matrix.os == 'ubuntu-22.04' }}
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          if [ "${SONAR_TOKEN}" != '' ]; then
+            echo 'is_SONAR_TOKEN_set=true' >> $GITHUB_OUTPUT
+          fi
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: corretto
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: ${{ !steps.check-secret.outputs.is_SONAR_TOKEN_set && 1 || 0 }}  # Shallow clones should be disabled for a better relevancy of SonarCloud analysis
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+          key: ${{ matrix.os }}-gradle-${{ hashFiles('**/*.gradle.kts', 'gradle.properties', 'gradle/libs.versions.toml', 'gradle/pluginLibs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties') }}
+      - name: Cache Sonar packages
+        uses: actions/cache@v4
+        if: ${{ steps.check-secret.outputs.is_SONAR_TOKEN_set }}
+        with:
+          path: |
+            ~/.sonar/cache
+          key: ${{ matrix.os }}-sonar-${{ hashFiles('gradle/pluginLibs.versions.toml') }}
+      - name: Cache node distribution
+        uses: actions/cache@v4
+        with:
+          path: |
+            .node
+          key: ${{ matrix.os }}-node-${{ hashFiles('gradle.properties') }}
+      - name: Cache yarn packages
+        uses: actions/cache@v4
+        with:
+          path: |
+           .yarn/cache
+          key: ${{ matrix.os }}-yarn-${{ hashFiles('yarn.lock') }}
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: |
+           .playwright
+          key: ${{ matrix.os }}-playwright-${{ hashFiles('yarn.lock') }}
+      - name: Gradle build
+        run: |
+          ./gradlew build -Pci --info --stacktrace --max-workers 4 --no-daemon
+      - name: Sonar analyze
+        if: ${{ steps.check-secret.outputs.is_SONAR_TOKEN_set }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed by Sonar to get PR information, if any
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          ./gradlew sonar -Pci --info --stacktrace --max-workers 4 --no-daemon
+      - name: Upload application artifacts
+        if: ${{ matrix.os == 'ubuntu-22.04' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: distributions
+          path: subprojects/**/build/distributions/*.tar
+          compression-level: 0
+          retention-days: 5  # No need to preserve for long, since they are uploaded to GHCR
+      - name: Build signed Maven repository
+        if: ${{ matrix.os == 'ubuntu-22.04' && github.event_name == 'push' && github.repository_owner == 'graphs4value' }}
+        env:
+          PGP_KEY: ${{ secrets.PGP_KEY }}
+          PGP_KEY_ID: ${{ secrets.PGP_KEY_ID }}
+          PGP_PASSWORD: ${{ secrets.PGP_PASSWORD }}
+        run: |
+          ./gradlew mavenRepository -Pci -PforceSign --info --stacktrace --max-workers 4 --no-daemon
+      - name: Build unsigned Maven repository
+        if: ${{ matrix.os == 'ubuntu-22.04' && (github.event_name != 'push' || github.repository_owner != 'graphs4value') }}
+        run: |
+          ./gradlew mavenRepository -Pci --info --stacktrace --max-workers 4 --no-daemon
+      - name: Merge Maven repository with site
+        if: ${{ matrix.os == 'ubuntu-22.04' }}
+        run: |
+          mv build/repo subprojects/docs/build/docusaurus/maven
+      - name: Upload GithHub Pages artifact
+        if: ${{ matrix.os == 'ubuntu-22.04' }}
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: subprojects/docs/build/docusaurus/
+          retention-days: 90
+  reuse-check:
+    name: REUSE Compliance Check
+    permissions:
+      contents: read
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: REUSE Compliance Check
+        uses: fsfe/reuse-action@bb774aa972c2a89ff34781233d275075cbddf542
+        with:
+          args: --include-meson-subprojects lint
+  publish-site:
+    name: Publish to GitHub Pages
+    if: ${{ github.event_name == 'push' && github.ref_name == 'main' && github.repository == 'graphs4value/refinery' }}
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
+    runs-on: ubuntu-22.04
+    environment:
+      name: github-pages
+      url: ${{steps.deployment.outputs.page_url}}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+  docker-build:
+    name: Build Docker images
+    needs: build
+    permissions:
+      packages: write
+      contents: read
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@49b3bc8e6bdd4a60e6116a5414239cba5943d3cf
+        with:
+          platforms: arm64
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@6524bf65af31da8d45b59e8c27de4bd072b392f5
+        with:
+          platforms: linux/amd64,linux/arm64
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Download application artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: distributions
+          path: subprojects
+      - name: Extract application artifacts
+        working-directory: ./docker
+        run: |
+          ./prepare_context.sh
+      - name: Bake images
+        working-directory: ./docker
+        run: |
+          ./bake.sh false --set '*.cache-from=gha' --set '*.cache-to=type=gha,mode=max'
+      - name: Log in to GitHub Container registry
+        if: ${{ github.event_name == 'push' && github.ref_name == 'main' && github.repository == 'graphs4value/refinery' }}
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload images to GitHub Container registry
+        if: ${{ github.event_name == 'push' && github.ref_name == 'main' && github.repository == 'graphs4value/refinery' }}
+        working-directory: ./docker
+        run: |
+          ./bake.sh true --set '*.cache-from=gha' --set '*.cache-to=type=gha,mode=max'
+      - name: Delete application artifacts
+        uses: geekyeggo/delete-artifact@f275313e70c08f6120db482d7a6b98377786765b
+        with:
+          name: distributions
+  deploy:
+    name: Deploy to server
+    if: ${{ github.event_name == 'push' && github.ref_name == 'main' && github.repository == 'graphs4value/refinery' }}
+    needs: docker-build
+    permissions: {}
+    runs-on: ubuntu-22.04
+    environment:
+      name: production
+      url: https://refinery.services
+    steps:
+      - name: Set up SSH agent
+        uses: webfactory/ssh-agent@a6f90b1f127823b31d4d4a8d96047790581349bd
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      - name: Deploy to server
+        env:
+          KNOWN_HOSTS: ${{ vars.KNOWN_HOSTS }}
+        run: |
+          echo "${KNOWN_HOSTS}" >> ~/.ssh/known_hosts
+          ssh refinery@refinery.services /var/lib/refinery/deploy.sh
