@@ -9,6 +9,7 @@ rootProject.name = "refinery"
 include(
 		"bom",
 		"bom-dependencies",
+		"chat",
 		"client-js",
 		"docs",
 		"frontend",
@@ -27,7 +28,6 @@ include(
 		"logic",
 		"store",
 		"store-dse",
-		"store-dse-evolutionary",
 		"store-dse-visualization",
 		"store-query",
 		"store-query-interpreter",

@@ -37,10 +37,6 @@ public class Transformation {
 		return activations;
 	}
 
-	public int getActivationCount() {
-		return activations.size();
-	}
-
 	public Tuple getActivation(int index) {
 		return activations.getKey(index);
 	}
