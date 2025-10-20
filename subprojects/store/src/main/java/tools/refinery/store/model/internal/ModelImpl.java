@@ -62,8 +62,10 @@ public class ModelImpl implements Model {
 	@Override
 	public ModelDiffCursor getDiffCursor(Version to) {
 		var diffCursors = HashMap.<AnySymbol, DiffCursor<?, ?>>newHashMap(interpretations.size());
-		for (var entry : interpretations.entrySet()) {
-			diffCursors.put(entry.getKey(), entry.getValue().getDiffCursor(to));
+		var iter = interpretations.entrySet().iterator();
+		for (int i = 0; i < interpretations.entrySet().size(); i++) {
+			var entry = iter.next();
+			diffCursors.put(entry.getKey(), entry.getValue().getDiffCursor(ModelVersion.getInternalVersion(to,i)));
 		}
 		return new ModelDiffCursor(diffCursors);
 	}

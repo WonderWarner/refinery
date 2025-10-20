@@ -35,6 +35,16 @@ public class ModelStoreImpl implements ModelStore {
 		return Collections.unmodifiableCollection(stores.keySet());
 	}
 
+	@Override
+	public AnySymbol getSymbolByName(String name) {
+		for (var symbol : stores.keySet()) {
+			if (symbol.name().equals(name)) {
+				return symbol;
+			}
+		}
+		return null;
+	}
+
 	private ModelImpl createModelWithoutInterpretations(Version state) {
 		return new ModelImpl(this, state, adapters.size());
 	}

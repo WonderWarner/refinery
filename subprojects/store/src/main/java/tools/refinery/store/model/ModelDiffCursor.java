@@ -29,4 +29,8 @@ public class ModelDiffCursor {
 		var typedCursor = (DiffCursor<Tuple, T>) cursor;
 		return typedCursor;
 	}
+
+	public Map<? extends AnySymbol, ? extends DiffCursor<?, ?>> getDiffCursors() {
+		return diffCursors;
+	}
 }

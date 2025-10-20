@@ -9,6 +9,7 @@ import org.moeaframework.core.Solution;
 import org.moeaframework.core.operator.Mutation;
 import tools.refinery.store.dse.transition.Transformation;
 import tools.refinery.store.map.Version;
+import tools.refinery.visualization.statespace.VisualizationStore;
 
 import java.util.Random;
 
@@ -16,8 +17,13 @@ class RuleBasedMutation implements Mutation {
 	private final RefineryProblem problem;
 	private final Random random = new Random();
 
+	private final VisualizationStore visualizationStore;
+	private final boolean isVisualizationEnabled;
+
 	public RuleBasedMutation(RefineryProblem problem) {
 		this.problem = problem;
+		visualizationStore = problem.getVisualizationStore();
+		isVisualizationEnabled = visualizationStore != null;
 	}
 
 	@Override
@@ -29,8 +35,9 @@ class RuleBasedMutation implements Mutation {
 		}
 
 		problem.getModel().restore(version);
+		var dseAdapter = problem.getDSEAdapter();
 
-		var transformations = problem.getDSEAdapter().getTransformations();
+		var transformations = dseAdapter.getTransformations();
 		var weights = new double[transformations.size()];
 		double totalWeight = 0;
 		int totalActivationCount = 0;
@@ -58,6 +65,13 @@ class RuleBasedMutation implements Mutation {
 		}
 
 		RefineryProblem.setVersion(child, childVersion);
+
+		//TODO add to visualizationStore
+		// DSE Adapter might be useful, see in BestFirstWorker
+		if(isVisualizationEnabled) {
+
+		}
+
 		return child;
 	}
 

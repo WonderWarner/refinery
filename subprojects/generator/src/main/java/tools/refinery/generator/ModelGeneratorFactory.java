@@ -9,6 +9,7 @@ import tools.refinery.generator.impl.CancellableCancellationToken;
 import tools.refinery.generator.impl.ModelGeneratorImpl;
 import tools.refinery.language.model.problem.Problem;
 import tools.refinery.language.semantics.TracedException;
+import tools.refinery.store.dse.modification.ModificationAdapter;
 import tools.refinery.store.dse.propagation.PropagationAdapter;
 import tools.refinery.store.dse.transition.DesignSpaceExplorationAdapter;
 import tools.refinery.store.model.ModelStore;
@@ -20,6 +21,8 @@ import tools.refinery.store.reasoning.translator.TranslationException;
 import tools.refinery.store.statecoding.StateCodeCalculatorFactory;
 import tools.refinery.store.statecoding.StateCoderAdapter;
 import tools.refinery.store.statecoding.neighborhood.NeighborhoodCalculator;
+import tools.refinery.visualization.ModelVisualizerAdapter;
+import tools.refinery.visualization.internal.FileFormat;
 
 import java.util.Collection;
 import java.util.Set;
@@ -71,6 +74,13 @@ public final class ModelGeneratorFactory extends ModelFacadeFactory<ModelGenerat
 				.cancellationToken(cancellationToken)
 				.with(QueryInterpreterAdapter.builder())
 				.with(PropagationAdapter.builder())
+				.with(ModificationAdapter.builder())
+				.with(ModelVisualizerAdapter.builder()
+						.withOutputPath("test_output")
+						.withFormat(FileFormat.DOT)
+						.withFormat(FileFormat.SVG)
+						.saveStates()
+						.saveDesignSpace())
 				.with(StateCoderAdapter.builder()
 						.stateCodeCalculatorFactory(getStateCodeCalculatorFactory()))
 				.with(DesignSpaceExplorationAdapter.builder())
