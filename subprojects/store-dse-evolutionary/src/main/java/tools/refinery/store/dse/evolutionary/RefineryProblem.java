@@ -16,37 +16,47 @@ import tools.refinery.visualization.statespace.internal.VisualizationStoreImpl;
 
 public class RefineryProblem extends AbstractProblem {
     public static final int DEFAULT_RANDOMIZE_DEPTH = 1;
-    private static final int VERSION_VARIABLE_INDEX = 0;
-    private static final int ACCEPT_CONSTRAINT_INDEX = 0;
-    private static final double ACCEPT_FEASIBLE = 0.0;
-    private static final double ACCEPT_INFEASIBLE = 0.0;
+    public static final boolean DEFAULT_VISUALIZATION_ENABLED = false;
 
     private final Model model;
     private final Version initialVersion;
+    private final VisualizationStore visualizationStore;
     private final int randomizeDepth;
     private final DesignSpaceExplorationAdapter dseAdapter;
     private final @Nullable PropagationAdapter propagationAdapter;
-    private final VisualizationStore visualizationStore;
     private final RuleBasedMutation ruleBasedMutation;
+    private final GraphDiffCrossover graphDiffCrossover;
 
     public RefineryProblem(ModelStore store, Version initialVersion) {
-        this(store, initialVersion, DEFAULT_RANDOMIZE_DEPTH);
+        this(store, initialVersion, DEFAULT_RANDOMIZE_DEPTH, DEFAULT_VISUALIZATION_ENABLED);
+    }
+
+    public RefineryProblem(ModelStore store, Version initialVersion, boolean isVisualizationEnabled) {
+        this(store, initialVersion, DEFAULT_RANDOMIZE_DEPTH, isVisualizationEnabled);
     }
 
     public RefineryProblem(ModelStore store, Version initialVersion, int randomizeDepth) {
+        this(store, initialVersion, randomizeDepth, DEFAULT_VISUALIZATION_ENABLED);
+    }
+
+    public RefineryProblem(ModelStore store, Version initialVersion, int randomizeDepth, boolean isVisualizationEnabled) {
         super(1, store.getAdapter(DesignSpaceExplorationStoreAdapter.class).getObjectives().size(), 1);
         if (randomizeDepth < 0) {
             throw new IllegalArgumentException("randomizeDepth must be positive or zero");
         }
         model = store.createEmptyModel();
         this.initialVersion = initialVersion;
+        if (isVisualizationEnabled) visualizationStore = new VisualizationStoreImpl();
+        else visualizationStore = null;
         this.randomizeDepth = randomizeDepth;
         dseAdapter = model.getAdapter(DesignSpaceExplorationAdapter.class);
         propagationAdapter = model.tryGetAdapter(PropagationAdapter.class).orElse(null);
-        visualizationStore = new VisualizationStoreImpl();
         ruleBasedMutation = new RuleBasedMutation(this);
+        graphDiffCrossover = new GraphDiffCrossover(this, 0.5);
+    }
 
-        visualizationStore.addState(initialVersion, dseAdapter.getObjectiveValue().toString());
+    public VisualizationStore getVisualizationStore() {
+        return visualizationStore;
     }
 
     public int getRandomizeDepth() {
@@ -64,10 +74,6 @@ public class RefineryProblem extends AbstractProblem {
     @Nullable
     PropagationAdapter getPropagationAdapter() {
         return propagationAdapter;
-    }
-
-    VisualizationStore getVisualizationStore() {
-        return visualizationStore;
     }
 
     @Override
@@ -99,24 +105,26 @@ public class RefineryProblem extends AbstractProblem {
             visualizationStore.addSolution(version);
         }
 
-        solution.setConstraintValue(ACCEPT_CONSTRAINT_INDEX,
-                dseAdapter.checkAccept() ? ACCEPT_FEASIBLE : ACCEPT_INFEASIBLE);
+        solution.setConstraintValue(0,
+                dseAdapter.checkAccept() ? 0.0 : 0.0);
     }
 
     private void setInfeasible(Solution solution) {
         for (int i = 0; i < numberOfObjectives; i++) {
             solution.setObjectiveValue(i, Double.POSITIVE_INFINITY);
         }
-        solution.setConstraintValue(ACCEPT_CONSTRAINT_INDEX, ACCEPT_INFEASIBLE);
+        solution.setConstraintValue(0, 0.0);
     }
 
     @Override
     public Solution newSolution() {
         var solution = new Solution(numberOfVariables, numberOfObjectives, numberOfConstraints);
-        solution.setVariable(VERSION_VARIABLE_INDEX, new VersionVariable(this, initialVersion));
-        solution.setConstraint(ACCEPT_CONSTRAINT_INDEX, new LessThanOrEqual(0.0));
+        solution.setVariable(0, new VersionVariable(this, initialVersion));
+        solution.setConstraint(0, new LessThanOrEqual(0.0));
 
-        visualizationStore.addState(getVersion(solution), dseAdapter.getObjectiveValue().toString());
+        if (visualizationStore != null) {
+            visualizationStore.addState(getVersion(solution), dseAdapter.getObjectiveValue().toString());
+        }
 
         return solution;
     }
@@ -132,10 +140,13 @@ public class RefineryProblem extends AbstractProblem {
     }
 
     public static @Nullable Version getVersion(Solution solution) {
-        return ((VersionVariable) solution.getVariable(VERSION_VARIABLE_INDEX)).getVersion();
+        return ((VersionVariable) solution.getVariable(0)).getVersion();
     }
 
     static void setVersion(Solution solution, @Nullable Version version) {
-        ((VersionVariable) solution.getVariable(VERSION_VARIABLE_INDEX)).setVersion(version);
+        ((VersionVariable) solution.getVariable(0)).setVersion(version);
     }
+
+    // TODO: uncomment if needed
+    // public Variation getCrossover() { return graphDiffCrossover; }
 }

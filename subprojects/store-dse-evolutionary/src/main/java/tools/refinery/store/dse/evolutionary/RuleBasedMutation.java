@@ -17,8 +17,8 @@ class RuleBasedMutation implements Mutation {
 
     public RuleBasedMutation(RefineryProblem problem) {
         this.problem = problem;
-        this.visualizationStore = problem.getVisualizationStore();
-        this.isVisualizationEnabled = visualizationStore != null;
+        visualizationStore = problem.getVisualizationStore();
+        isVisualizationEnabled = visualizationStore != null;
     }
 
     @Override
@@ -30,11 +30,11 @@ class RuleBasedMutation implements Mutation {
         }
 
         problem.getModel().restore(version);
-
         var transformations = problem.getDSEAdapter().getTransformations();
         var weights = new double[transformations.size()];
         double totalWeight = 0;
         int totalActivationCount = 0;
+
         for (int i = 0; i < weights.length; i++) {
             var transformation = transformations.get(i);
             int activationCount = transformation.getActivationCount();

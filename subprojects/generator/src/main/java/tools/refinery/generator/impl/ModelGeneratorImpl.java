@@ -16,6 +16,7 @@ import tools.refinery.store.dse.transition.statespace.SolutionStore;
 import tools.refinery.store.map.Version;
 import tools.refinery.store.reasoning.interpretation.PartialInterpretation;
 import tools.refinery.store.reasoning.representation.PartialSymbol;
+import tools.refinery.visualization.ModelVisualizerAdapter;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -95,6 +96,9 @@ public class ModelGeneratorImpl extends ConcreteModelFacade implements ModelGene
 		}
 		getModel().restore(solutions.getFirst().version());
 		solutionStore = bestFirst.getSolutionStore();
+		//TODO visszavenni ha van új modell
+		// getModel().getAdapter(ModelVisualizerAdapter.class).visualize(bestFirst.getVisualizationStore());
+
 		return GeneratorResult.SUCCESS;
 	}
 
@@ -130,5 +134,10 @@ public class ModelGeneratorImpl extends ConcreteModelFacade implements ModelGene
 		if (!isLastGenerationSuccessful()) {
 			throw new IllegalStateException("No generated model is available");
 		}
+	}
+
+	@Override
+	public SolutionStore getSolutionStore() {
+		return solutionStore;
 	}
 }

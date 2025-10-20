@@ -16,6 +16,8 @@ import java.util.Optional;
 public interface ModelStore {
 	Collection<AnySymbol> getSymbols();
 
+	AnySymbol getSymbolByName(String name);
+
 	Model createEmptyModel();
 
 	Model createModelForState(Version state);

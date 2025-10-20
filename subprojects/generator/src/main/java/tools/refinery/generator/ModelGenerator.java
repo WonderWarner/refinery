@@ -5,6 +5,8 @@
  */
 package tools.refinery.generator;
 
+import tools.refinery.store.dse.transition.statespace.SolutionStore;
+
 import java.util.concurrent.TimeUnit;
 
 public interface ModelGenerator extends ModelFacade {
@@ -35,4 +37,6 @@ public interface ModelGenerator extends ModelFacade {
 	default void generateWithTimeout(long l, TimeUnit timeUnit) {
 		tryGenerateWithTimeout(l, timeUnit).orThrow();
 	}
+
+	public SolutionStore getSolutionStore();
 }

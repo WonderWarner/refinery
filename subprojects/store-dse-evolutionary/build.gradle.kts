@@ -14,8 +14,16 @@ mavenArtifact {
 }
 
 dependencies {
+<<<<<<< HEAD
     api(project(":refinery-store-dse"))
     api(project(":refinery-store-dse-visualization"))
     api(libs.moea)
     testImplementation(project(":refinery-store-query-interpreter"))
+=======
+	api(project(":refinery-store-dse"))
+	api(project(":refinery-store-dse-visualization"))
+	api(project(":refinery-store-reasoning"))
+	api(libs.moea)
+	testImplementation(project(":refinery-store-query-interpreter"))
+>>>>>>> moea
 }
