@@ -30,4 +30,5 @@ tasks.register<JavaExec>("cli") {
 	standardInput = System.`in`
 	group = "Run"
 	description = "Run the Refinery CLI application"
+	isIgnoreExitValue = true
 }

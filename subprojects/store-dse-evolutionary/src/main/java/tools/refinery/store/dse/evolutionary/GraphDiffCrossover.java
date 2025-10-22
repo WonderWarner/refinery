@@ -2,6 +2,8 @@ package tools.refinery.store.dse.evolutionary;
 
 import org.moeaframework.core.Solution;
 import org.moeaframework.core.operator.Variation;
+import tools.refinery.logic.term.cardinalityinterval.CardinalityInterval;
+import tools.refinery.logic.term.truthvalue.TruthValue;
 import tools.refinery.store.map.Version;
 import tools.refinery.store.map.internal.delta.MapDelta;
 import tools.refinery.store.model.*;
@@ -9,16 +11,21 @@ import tools.refinery.store.reasoning.translator.typehierarchy.InferredType;
 import tools.refinery.store.representation.AnySymbol;
 import tools.refinery.store.representation.Symbol;
 import tools.refinery.store.tuple.Tuple;
+
 import java.util.*;
 
-public class GraphDiffCrossover /*TODO uncomment implements Variation*/ {
+public class GraphDiffCrossover implements Variation {
 
 	private static final String TYPE_SYMBOL_NAME = "TYPE";
 	private static final String COUNT_SYMBOL_NAME = "COUNT";
 	private static final String MODEL_SIZE_SYMBOL_NAME = "MODEL_SIZE";
+	private static final String CONTAINS_SYMBOL_NAME = "CONTAINS";
 	private static final Random random = new Random();
 
 	private final RefineryProblem problem;
+	private final Model model;
+	private final ModelStore modelStore;
+	private ModelDiffCursor diffCursor;
 	private final double includeDiffRatio;
 
 	public GraphDiffCrossover(RefineryProblem problem, double includeDiffRatio) {
@@ -27,19 +34,22 @@ public class GraphDiffCrossover /*TODO uncomment implements Variation*/ {
 			throw new IllegalArgumentException("Inclusion of differences ratio must be between 0 and 1");
 		}
 		this.includeDiffRatio = includeDiffRatio;
+		this.model = problem.getModel();
+		this.modelStore = model.getStore();
+		this.diffCursor = null; // Will be set in evolve method
 	}
 
-	//TODO uncomment @Override
+	@Override
 	public String getName() {
 		return this.getClass().getSimpleName();
 	}
 
-	//TODO uncomment @Override
+	@Override
 	public int getArity() {
 		return 2;
 	}
 
-	//TODO uncomment @Override
+	@Override
 	public Solution[] evolve(Solution[] solutions) {
 		if (solutions.length != this.getArity()) {
 			throw new IllegalArgumentException("This Crossover requires " + this.getArity() + " solutions");
@@ -52,12 +62,36 @@ public class GraphDiffCrossover /*TODO uncomment implements Variation*/ {
 			return new Solution[] {};
 		}
 
-		var model = problem.getModel();
-		var modelStore = model.getStore();
-		model.restore(version1);
-		var diffCursor = model.getDiffCursor(version2);
+		var abstractIdsOfVersion1 = new HashSet<Integer>();
+		var abstractIdsOfVersion2 = new HashSet<Integer>();
+		var sizeOfVersion1 = getSizeOfVersionAndCollectAbstractIds(version1, abstractIdsOfVersion1);
+		var sizeOfVersion2 = getSizeOfVersionAndCollectAbstractIds(version2, abstractIdsOfVersion2);
 
-		var childVersion = mergeDiffAndCommit(model, modelStore, diffCursor);
+		// Count nodes for both versions and pick the one with fewer nodes as the base
+		if (sizeOfVersion1 > sizeOfVersion2) {
+			var tempVersion = version1;
+			version1 = version2;
+			version2 = tempVersion;
+
+			var tempIds = abstractIdsOfVersion1;
+			abstractIdsOfVersion1 = abstractIdsOfVersion2;
+			abstractIdsOfVersion2 = tempIds;
+		}
+
+		// preserveIds will be kept from version1 and should be ignored when applying diffs
+		var preserveIds = new HashSet<Integer>();
+		// abstractIdsOfVersion2 that are not in version1 will be changed to the abstract version
+		// it's edges also should be set to UNKNOWN
+		for (Integer id : abstractIdsOfVersion1) {
+			if (!abstractIdsOfVersion2.remove(id)) {
+				preserveIds.add(id);
+			}
+		}
+
+		model.restore(version1);
+		this.diffCursor = model.getDiffCursor(version2);
+
+		var childVersion = mergeDiffAndCommit(preserveIds, abstractIdsOfVersion2);
 		if (childVersion == null) {
 			return new Solution[] {};
 		}
@@ -66,21 +100,44 @@ public class GraphDiffCrossover /*TODO uncomment implements Variation*/ {
 		return new Solution[] { child };
 	}
 
-	//TODO after testing:
-	// model modelStore and diffCursor could be parameters of the class instead of each method
-	// can be private
-	public Version mergeDiffAndCommit(Model model, ModelStore modelStore, ModelDiffCursor diffCursor) {
+	private long getSizeOfVersionAndCollectAbstractIds(Version version, Set<Integer> abstractIds) {
+		model.restore(version);
+		var countSymbol = modelStore.getSymbolByName(COUNT_SYMBOL_NAME);
+		if (countSymbol == null) {
+			throw new IllegalStateException(COUNT_SYMBOL_NAME + " symbol not found in model store");
+		}
+		var countAnyInterpretation = model.getInterpretation(countSymbol);
+		var countInterpretation = castInterpretation(countAnyInterpretation);
+		var cursor = countInterpretation.getAll();
+		while (cursor.move()) {
+			Tuple key = cursor.getKey();
+			Object value = cursor.getValue();
+			if (value instanceof CardinalityInterval ci && !ci.isConcrete()) {
+				abstractIds.add(key.get(0));
+			}
+		}
+		return countInterpretation.getSize();
+	}
+
+	private Version mergeDiffAndCommit(Set<Integer> idsToBePreserved, Set<Integer> idsToBeAbstracted) {
 
 		// Handling nodes
-		var deletedNodes = mergeNodesAndReturnDeletedIds(model, modelStore, diffCursor);
+		var nodeChanges = mergeNodesAndReturnDeletedIds(idsToBePreserved, idsToBeAbstracted);
 
 		// Handling edges and attributes
 		for (var anySymbol : modelStore.getSymbols()) {
-			if(anySymbol.name().equals(TYPE_SYMBOL_NAME) || anySymbol.name().equals(COUNT_SYMBOL_NAME) || anySymbol.name().equals(MODEL_SIZE_SYMBOL_NAME)) {
+			if(anySymbol.name().equals(TYPE_SYMBOL_NAME) || anySymbol.name().equals(COUNT_SYMBOL_NAME)
+					|| anySymbol.name().equals(MODEL_SIZE_SYMBOL_NAME) || anySymbol.name().equals(CONTAINS_SYMBOL_NAME)) {
 				continue;
 			}
 			var anyInterpretation = model.getInterpretation(anySymbol);
-			var deltas = getDeltasOfAnySymbol(diffCursor, anySymbol, anyInterpretation, deletedNodes);
+
+			var deletedOrAbstractedNodes = new HashSet<>(nodeChanges.deletedNodes);
+			deletedOrAbstractedNodes.addAll(idsToBeAbstracted);
+			var preservedOrIgnoredNodes = new HashSet<>(idsToBePreserved);
+			preservedOrIgnoredNodes.addAll(nodeChanges.nodesToIgnore);
+
+			var deltas = getDeltasOfAnySymbolWithIgnoreAndAbstraction(anySymbol, anyInterpretation, preservedOrIgnoredNodes, deletedOrAbstractedNodes);
 			Collections.shuffle(deltas);
 			int limit = (int) (deltas.size() * includeDiffRatio);
 			var interpretation = castInterpretation(anyInterpretation);
@@ -105,27 +162,36 @@ public class GraphDiffCrossover /*TODO uncomment implements Variation*/ {
 		return model.commit();
 	}
 
-	private Set<Integer> mergeNodesAndReturnDeletedIds(Model model, ModelStore modelStore, ModelDiffCursor diffCursor) {
-		var nodeChanges = updateTypes(model, modelStore, diffCursor);
-		updateCounts(model, modelStore, diffCursor, nodeChanges);
-		return nodeChanges.deletedNodes;
+	private NodeChanges mergeNodesAndReturnDeletedIds(Set<Integer> idsToBePreserved, Set<Integer> idsToBeAbstracted) {
+		var nodeChanges = updateTypes(idsToBePreserved, idsToBeAbstracted);
+		updateCounts(nodeChanges, idsToBeAbstracted);
+		return nodeChanges;
 	}
 
-	private NodeChanges updateTypes(Model model, ModelStore modelStore, ModelDiffCursor diffCursor) {
+	private NodeChanges updateTypes(Set<Integer> idsToBePreserved, Set<Integer> idsToBeAbstracted) {
 		var typeSymbol = modelStore.getSymbolByName(TYPE_SYMBOL_NAME);
 		if (typeSymbol == null) {
 			throw new IllegalStateException(TYPE_SYMBOL_NAME + " symbol not found in model store");
 		}
 		var typeAnyInterpretation = model.getInterpretation(typeSymbol);
-		var typeDeltas = getDeltasOfAnySymbol(diffCursor, typeSymbol, typeAnyInterpretation, null);
+		var typeDeltas = getDeltasOfAnySymbol(typeSymbol, typeAnyInterpretation);
 		var typeInterpretation = castInterpretation(typeAnyInterpretation);
 
 		var createdNodes = new HashSet<Integer>();
 		var deletedNodes = new HashSet<Integer>();
+		var nodesToIgnore = new HashSet<Integer>();
 
 		for (MapDelta<Tuple, ?> td : typeDeltas) {
 			int id = td.getKey().get(0);
-			if (random.nextDouble() < includeDiffRatio) {
+			if(idsToBePreserved.contains(id)) {
+				continue;
+			}
+			else if(idsToBeAbstracted.contains(id)) {
+				typeInterpretation.put(td.getKey(), td.getNewValue()); // works if we get diffs in the right order
+				System.out.println("Applying abstraction to " + typeSymbol.name() + " at " + td.getKey() +
+						" from " + td.getOldValue() + " to " + td.getNewValue());
+			}
+			else if (random.nextDouble() < includeDiffRatio) {
 				typeInterpretation.put(td.getKey(), td.getNewValue());
 				System.out.println("Applying change to " + typeSymbol.name() + " at " + td.getKey() +
 						" from " + td.getOldValue() + " to " + td.getNewValue());
@@ -141,79 +207,111 @@ public class GraphDiffCrossover /*TODO uncomment implements Variation*/ {
 				boolean hasDeletionForId = typeDeltas.stream()
 						.anyMatch(md -> md.getKey().get(0) == id && checkIfTypeValueIsNull(md.getNewValue()));
 				if (!hasDeletionForId) {
-					deletedNodes.add(id);
+					nodesToIgnore.add(id);
 				}
 			}
 		}
 
-		return new NodeChanges(createdNodes, deletedNodes);
+		return new NodeChanges(createdNodes, deletedNodes, nodesToIgnore);
 	}
 
 	private boolean checkIfTypeValueIsNull(Object value) {
 		return value instanceof InferredType type && type.candidateType() == null;
 	}
 
-	private void updateCounts(Model model, ModelStore modelStore, ModelDiffCursor diffCursor, NodeChanges nodeChanges) {
+	private void updateCounts(NodeChanges nodeChanges, Set<Integer> idsToBeAbstracted) {
 		var countSymbol = modelStore.getSymbolByName(COUNT_SYMBOL_NAME);
 		if (countSymbol == null) {
 			throw new IllegalStateException(COUNT_SYMBOL_NAME + " symbol not found in model store");
 		}
 		var countAnyInterpretation = model.getInterpretation(countSymbol);
-		var countDeltas = getDeltasOfAnySymbol(diffCursor, countSymbol, countAnyInterpretation, null);
 		var countInterpretation = castInterpretation(countAnyInterpretation);
 
-		//TODO check the form of giving COUNT etc. null [0] [0..12]
-		for (MapDelta<Tuple, ?> cd : countDeltas) {
-			int id = cd.getKey().get(0);
-			if (nodeChanges.createdNodes.contains(id) && cd.getOldValue() == null) {
-				System.out.println("Applying change to " + countSymbol.name() + " at " + cd.getKey() +
-						" from " + cd.getOldValue() + " to " + cd.getNewValue());
-				countInterpretation.put(cd.getKey(), cd.getNewValue());
-			}
-			else if (nodeChanges.deletedNodes.contains(id)) {
-				countInterpretation.put(cd.getKey(), 0);
-				System.out.println("Applying change to " + countSymbol.name() + " at " + cd.getKey() +
-						" from " + cd.getOldValue() + " to " + cd.getNewValue());
-			}
+		// 1) For every count diff whose key refers to a deleted node, set the interpretation to null.
+		for (int id: nodeChanges.deletedNodes) {
+			countInterpretation.put(Tuple.of(id), null);
+			System.out.println("Applying null to " + countSymbol.name() + " at " + id);
+		}
+
+		// 2) Collect last newValue for created nodes and nodes to be abstracted (per key) by scanning COUNT diffs and overwriting entries.
+		var nodesToUpdateCount = new HashSet<Integer>(nodeChanges.createdNodes);
+		nodesToUpdateCount.addAll(idsToBeAbstracted);
+		Map<Tuple, Object> newCountValues = collectNewCountForNodes((Symbol<?>) countSymbol, nodesToUpdateCount);
+
+		// 3) Apply collected last values to the interpretation.
+		for (Map.Entry<Tuple, Object> e : newCountValues.entrySet()) {
+			countInterpretation.put(e.getKey(), e.getValue());
+			System.out.println("Applying change to " + countSymbol.name() + " at " + e.getKey() +
+					" to " + e.getValue());
 		}
 	}
 
-	private List<MapDelta<Tuple, ?>> getDeltasOfAnySymbol(ModelDiffCursor diffCursor, AnySymbol anySymbol,
-															   AnyInterpretation interpretation,
-															   Set<Integer> excludeIds) {
+	private Map<Tuple, Object> collectNewCountForNodes(Symbol<?> countSymbol, Set<Integer> ids) {
+		Map<Tuple, Object> result = new HashMap<>();
+		var cursor = diffCursor.getCursor(countSymbol);
+		while (cursor.move()) {
+			Tuple key = cursor.getKey();
+			int id = key.get(0);
+			if (ids.contains(id)) {
+				// overwrite previous value for the same key so final map keeps the last seen newValue
+				// only works if the cursor moves in proper order
+				result.put(key, cursor.getToValue());
+			}
+		}
+		return result;
+	}
+
+	private List<MapDelta<Tuple, ?>> getDeltasOfAnySymbol(AnySymbol anySymbol, AnyInterpretation interpretation) {
+		return getDeltasOfAnySymbolWithIgnoreAndAbstraction(anySymbol, interpretation, null, null);
+	}
+
+	private List<MapDelta<Tuple, ?>> getDeltasOfAnySymbolWithIgnoreAndAbstraction(AnySymbol anySymbol, AnyInterpretation interpretation, Set<Integer> idsToBeIgnored, Set<Integer> idsToBeAbstractedOrDeleted) {
 		if (!(interpretation instanceof Interpretation<?>)) {
 			throw new IllegalStateException(anySymbol.name()+" symbol interpretation is not of type Interpretation");
 		}
 		var symbol = (Symbol<?>) anySymbol;
 		var cursor = diffCursor.getCursor(symbol);
 
-		Map<Tuple, MapDelta<Tuple, ?>> typeDeltas = new HashMap<>();
+		Map<Tuple, List<MapDelta<Tuple, ?>>> deltasToKeys = new HashMap<>();
 		while (cursor.move()) {
 			Tuple key = cursor.getKey();
 
-			if(checkIfShouldSkip(key, excludeIds)) {
+			if(isAnyIdOfKeyInSet(key, idsToBeIgnored)) {
 				continue;
 			}
+			else if(isAnyIdOfKeyInSet(key, idsToBeAbstractedOrDeleted)) {
+				try {
+					@SuppressWarnings("unchecked")
+					Interpretation<TruthValue> tvInterp = (Interpretation<TruthValue>) interpretation;
+					tvInterp.put(key, TruthValue.UNKNOWN);
+				} catch (ClassCastException e) {
+					@SuppressWarnings("unchecked")
+					Interpretation<Object> objInterp = (Interpretation<Object>) interpretation;
+					objInterp.put(key, null); // might check some other types as well (int, bool etc.)
+				}
+			}
+			else {
+				Object fromValue = cursor.getFromValue();
+				Object toValue = cursor.getToValue();
 
-			Object fromValue = cursor.getFromValue();
-			Object toValue = cursor.getToValue();
-
-			MapDelta<Tuple, ?> existing = typeDeltas.get(key);
-			if (existing != null && existing.getOldValue().equals(toValue) && existing.getNewValue().equals(fromValue)) {
-				typeDeltas.remove(key);
-			} else {
-				typeDeltas.put(key, new MapDelta<>(key, fromValue, toValue));
+				MapDelta<Tuple, ?> newDelta = new MapDelta<>(key, fromValue, toValue);
+				List<MapDelta<Tuple, ?>> deltasToKey = deltasToKeys.computeIfAbsent(key, k -> new ArrayList<>());
+				removeInverseOrAddDelta(deltasToKey, newDelta);
 			}
 		}
 
-		return new ArrayList<>(typeDeltas.values());
+		List<MapDelta<Tuple, ?>> result = new ArrayList<>();
+		for (List<MapDelta<Tuple, ?>> l : deltasToKeys.values()) {
+			result.addAll(l);
+		}
+		return result;
 	}
 
-	private boolean checkIfShouldSkip(Tuple key, Set<Integer> excludeIds) {
-		if (excludeIds != null && !excludeIds.isEmpty()) {
+	private boolean isAnyIdOfKeyInSet(Tuple key, Set<Integer> ids) {
+		if (ids != null && !ids.isEmpty()) {
 			for (int i = 0; i < key.getSize(); i++) {
 				Object elem = key.get(i);
-				if (excludeIds.contains(elem)) {
+				if (ids.contains(elem)) {
 					return true;
 				}
 			}
@@ -221,10 +319,29 @@ public class GraphDiffCrossover /*TODO uncomment implements Variation*/ {
 		return false;
 	}
 
+	private void removeInverseOrAddDelta(List<MapDelta<Tuple, ?>> deltasToKey, MapDelta<Tuple, ?> newDelta) {
+		for (Iterator<MapDelta<Tuple, ?>> it = deltasToKey.iterator(); it.hasNext(); ) {
+			MapDelta<Tuple, ?> existingDelta = it.next();
+			if (isInverse(existingDelta, newDelta)) {
+				it.remove();
+				return;
+			}
+		}
+		deltasToKey.add(newDelta);
+	}
+
+	private boolean isInverse(MapDelta<Tuple, ?> existingDelta, MapDelta<Tuple, ?> newDelta) {
+		Object existingDeltaOldValue = existingDelta.getOldValue();
+		Object existingDeltaNewValue = existingDelta.getNewValue();
+		Object newDeltaOldValue = newDelta.getOldValue();
+		Object newDeltaNewValue = newDelta.getNewValue();
+		return Objects.equals(existingDeltaOldValue, newDeltaNewValue) && Objects.equals(existingDeltaNewValue, newDeltaOldValue);
+	}
+
 	@SuppressWarnings("unchecked")
 	private static <T> Interpretation<T> castInterpretation(AnyInterpretation anyInterpretation) {
 		return (Interpretation<T>) anyInterpretation;
 	}
 
-	private record NodeChanges(Set<Integer> createdNodes, Set<Integer> deletedNodes) {}
+	private record NodeChanges(Set<Integer> createdNodes, Set<Integer> deletedNodes, Set<Integer> nodesToIgnore) {}
 }

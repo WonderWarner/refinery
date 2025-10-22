@@ -74,7 +74,6 @@ public final class ModelGeneratorFactory extends ModelFacadeFactory<ModelGenerat
 				.cancellationToken(cancellationToken)
 				.with(QueryInterpreterAdapter.builder())
 				.with(PropagationAdapter.builder())
-				.with(ModificationAdapter.builder())
 				.with(ModelVisualizerAdapter.builder()
 						.withOutputPath("test_output")
 						.withFormat(FileFormat.DOT)
