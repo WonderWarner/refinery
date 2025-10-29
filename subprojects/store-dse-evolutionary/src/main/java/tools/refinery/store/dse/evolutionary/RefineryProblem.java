@@ -4,6 +4,7 @@ import org.jetbrains.annotations.Nullable;
 import org.moeaframework.core.Solution;
 import org.moeaframework.core.constraint.LessThanOrEqual;
 import org.moeaframework.core.operator.Mutation;
+import org.moeaframework.core.operator.Variation;
 import org.moeaframework.problem.AbstractProblem;
 import tools.refinery.store.dse.propagation.PropagationAdapter;
 import tools.refinery.store.dse.transition.DesignSpaceExplorationAdapter;
@@ -25,7 +26,7 @@ public class RefineryProblem extends AbstractProblem {
     private final DesignSpaceExplorationAdapter dseAdapter;
     private final @Nullable PropagationAdapter propagationAdapter;
     private final RuleBasedMutation ruleBasedMutation;
-    private final GraphDiffCrossover graphDiffCrossover;
+    private final DeltaCrossover deltaCrossover;
 
     public RefineryProblem(ModelStore store, Version initialVersion) {
         this(store, initialVersion, DEFAULT_RANDOMIZE_DEPTH, DEFAULT_VISUALIZATION_ENABLED);
@@ -52,7 +53,7 @@ public class RefineryProblem extends AbstractProblem {
         dseAdapter = model.getAdapter(DesignSpaceExplorationAdapter.class);
         propagationAdapter = model.tryGetAdapter(PropagationAdapter.class).orElse(null);
         ruleBasedMutation = new RuleBasedMutation(this);
-        graphDiffCrossover = new GraphDiffCrossover(this, 0.5);
+        deltaCrossover = new DeltaCrossover(this, 0.5);
     }
 
     public VisualizationStore getVisualizationStore() {
@@ -106,7 +107,7 @@ public class RefineryProblem extends AbstractProblem {
         }
 
         solution.setConstraintValue(0,
-                dseAdapter.checkAccept() ? 0.0 : 0.0);
+                dseAdapter.checkAccept() ? 0.0 : 0.0); //TODO
     }
 
     private void setInfeasible(Solution solution) {
@@ -147,6 +148,6 @@ public class RefineryProblem extends AbstractProblem {
         ((VersionVariable) solution.getVariable(0)).setVersion(version);
     }
 
-    // TODO: uncomment if needed
-    // public Variation getCrossover() { return graphDiffCrossover; }
+
+    public Variation getCrossover() { return deltaCrossover; }
 }

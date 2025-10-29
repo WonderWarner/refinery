@@ -8,6 +8,7 @@ package tools.refinery.store.dse.evolutionary;
 import org.junit.jupiter.api.Test;
 import org.moeaframework.algorithm.NSGAII;
 import org.moeaframework.core.Solution;
+import org.moeaframework.core.operator.CompoundVariation;
 import org.moeaframework.core.population.NondominatedPopulation;
 import tools.refinery.logic.term.int_.IntTerms;
 import tools.refinery.logic.term.real.RealTerms;
@@ -325,8 +326,12 @@ class CRAExamplesTest {
 
 		RefineryProblem problem = new RefineryProblem(store, initialVersion, 5);
 		NSGAII algorithm = new NSGAII(problem);
+		var variation = new CompoundVariation(
+				problem.getCrossover(),
+				problem.getMutation()
+		);
 
-		algorithm.setVariation(problem.getMutation());
+		algorithm.setVariation(variation);
 		algorithm.setInitialPopulationSize(10);
 
 		algorithm.run(10000);

@@ -11,10 +11,11 @@ import tools.refinery.store.reasoning.translator.typehierarchy.InferredType;
 import tools.refinery.store.representation.AnySymbol;
 import tools.refinery.store.representation.Symbol;
 import tools.refinery.store.tuple.Tuple;
+import tools.refinery.visualization.statespace.VisualizationStore;
 
 import java.util.*;
 
-public class GraphDiffCrossover implements Variation {
+public class DeltaCrossover implements Variation {
 
 	private static final String TYPE_SYMBOL_NAME = "TYPE";
 	private static final String COUNT_SYMBOL_NAME = "COUNT";
@@ -25,18 +26,26 @@ public class GraphDiffCrossover implements Variation {
 	private final RefineryProblem problem;
 	private final Model model;
 	private final ModelStore modelStore;
+	private final VisualizationStore visualizationStore;
+	private final boolean isVisualizationEnabled;
 	private ModelDiffCursor diffCursor;
-	private final double includeDiffRatio;
+	private final double deltaSelectionRatio;
 
-	public GraphDiffCrossover(RefineryProblem problem, double includeDiffRatio) {
+	public DeltaCrossover(RefineryProblem problem, double deltaSelectionRatio) {
 		this.problem = problem;
-		if(includeDiffRatio <= 0.0 || includeDiffRatio >= 1.0) {
+		if(deltaSelectionRatio <= 0.0 || deltaSelectionRatio >= 1.0) {
 			throw new IllegalArgumentException("Inclusion of differences ratio must be between 0 and 1");
 		}
-		this.includeDiffRatio = includeDiffRatio;
+		this.deltaSelectionRatio = deltaSelectionRatio;
 		this.model = problem.getModel();
 		this.modelStore = model.getStore();
+		visualizationStore = problem.getVisualizationStore();
+		isVisualizationEnabled = visualizationStore != null;
 		this.diffCursor = null; // Will be set in evolve method
+	}
+
+	public void setRandomSeed(long seed) {
+		random.setSeed(seed);
 	}
 
 	@Override
@@ -91,12 +100,19 @@ public class GraphDiffCrossover implements Variation {
 		model.restore(version1);
 		this.diffCursor = model.getDiffCursor(version2);
 
-		var childVersion = mergeDiffAndCommit(preserveIds, abstractIdsOfVersion2);
+		var childVersion = applyDeltasAndCommit(preserveIds, abstractIdsOfVersion2);
 		if (childVersion == null) {
 			return new Solution[] {};
 		}
 
 		RefineryProblem.setVersion(child, childVersion);
+
+		if (isVisualizationEnabled) {
+			visualizationStore.addState(childVersion, problem.getDSEAdapter().getObjectiveValue().toString());
+			visualizationStore.addTransition(version1, childVersion, Double.toString(1- deltaSelectionRatio));
+			visualizationStore.addTransition(version1, childVersion, Double.toString(deltaSelectionRatio));
+		}
+
 		return new Solution[] { child };
 	}
 
@@ -119,10 +135,10 @@ public class GraphDiffCrossover implements Variation {
 		return countInterpretation.getSize();
 	}
 
-	private Version mergeDiffAndCommit(Set<Integer> idsToBePreserved, Set<Integer> idsToBeAbstracted) {
+	private Version applyDeltasAndCommit(Set<Integer> toPreserveIds, Set<Integer> toAbstractIds) {
 
 		// Handling nodes
-		var nodeChanges = mergeNodesAndReturnDeletedIds(idsToBePreserved, idsToBeAbstracted);
+		var nodeChanges = mergeNodesAndReturnDeletedIds(toPreserveIds, toAbstractIds);
 
 		// Handling edges and attributes
 		for (var anySymbol : modelStore.getSymbols()) {
@@ -132,14 +148,14 @@ public class GraphDiffCrossover implements Variation {
 			}
 			var anyInterpretation = model.getInterpretation(anySymbol);
 
-			var deletedOrAbstractedNodes = new HashSet<>(nodeChanges.deletedNodes);
-			deletedOrAbstractedNodes.addAll(idsToBeAbstracted);
-			var preservedOrIgnoredNodes = new HashSet<>(idsToBePreserved);
-			preservedOrIgnoredNodes.addAll(nodeChanges.nodesToIgnore);
+			var toDeleteOrAbstractIds = new HashSet<>(nodeChanges.deletedNodes);
+			toDeleteOrAbstractIds.addAll(toAbstractIds);
+			var toPreserveOrIgnoreIds = new HashSet<>(toPreserveIds);
+			toPreserveOrIgnoreIds.addAll(nodeChanges.nodesToIgnore);
 
-			var deltas = getDeltasOfAnySymbolWithIgnoreAndAbstraction(anySymbol, anyInterpretation, preservedOrIgnoredNodes, deletedOrAbstractedNodes);
-			Collections.shuffle(deltas);
-			int limit = (int) (deltas.size() * includeDiffRatio);
+			var deltas = getDeltasOfAnySymbolWithIgnoreAndAbstraction(anySymbol, anyInterpretation, toPreserveOrIgnoreIds, toDeleteOrAbstractIds);
+			Collections.shuffle(deltas, random);
+			int limit = (int) (deltas.size() * deltaSelectionRatio);
 			var interpretation = castInterpretation(anyInterpretation);
 
 			for (int i = 0; i < limit; i++) {
@@ -162,13 +178,13 @@ public class GraphDiffCrossover implements Variation {
 		return model.commit();
 	}
 
-	private NodeChanges mergeNodesAndReturnDeletedIds(Set<Integer> idsToBePreserved, Set<Integer> idsToBeAbstracted) {
-		var nodeChanges = updateTypes(idsToBePreserved, idsToBeAbstracted);
-		updateCounts(nodeChanges, idsToBeAbstracted);
+	private NodeChanges mergeNodesAndReturnDeletedIds(Set<Integer> toPreserveIds, Set<Integer> toAbstractIds) {
+		var nodeChanges = updateTypes(toPreserveIds, toAbstractIds);
+		updateCounts(nodeChanges, toAbstractIds);
 		return nodeChanges;
 	}
 
-	private NodeChanges updateTypes(Set<Integer> idsToBePreserved, Set<Integer> idsToBeAbstracted) {
+	private NodeChanges updateTypes(Set<Integer> toPreserveIds, Set<Integer> toAbstractIds) {
 		var typeSymbol = modelStore.getSymbolByName(TYPE_SYMBOL_NAME);
 		if (typeSymbol == null) {
 			throw new IllegalStateException(TYPE_SYMBOL_NAME + " symbol not found in model store");
@@ -183,15 +199,15 @@ public class GraphDiffCrossover implements Variation {
 
 		for (MapDelta<Tuple, ?> td : typeDeltas) {
 			int id = td.getKey().get(0);
-			if(idsToBePreserved.contains(id)) {
+			if(toPreserveIds.contains(id)) {
 				continue;
 			}
-			else if(idsToBeAbstracted.contains(id)) {
+			else if(toAbstractIds.contains(id)) {
 				typeInterpretation.put(td.getKey(), td.getNewValue()); // works if we get diffs in the right order
 				System.out.println("Applying abstraction to " + typeSymbol.name() + " at " + td.getKey() +
 						" from " + td.getOldValue() + " to " + td.getNewValue());
 			}
-			else if (random.nextDouble() < includeDiffRatio) {
+			else if (random.nextDouble() < deltaSelectionRatio) {
 				typeInterpretation.put(td.getKey(), td.getNewValue());
 				System.out.println("Applying change to " + typeSymbol.name() + " at " + td.getKey() +
 						" from " + td.getOldValue() + " to " + td.getNewValue());
@@ -219,7 +235,7 @@ public class GraphDiffCrossover implements Variation {
 		return value instanceof InferredType type && type.candidateType() == null;
 	}
 
-	private void updateCounts(NodeChanges nodeChanges, Set<Integer> idsToBeAbstracted) {
+	private void updateCounts(NodeChanges nodeChanges, Set<Integer> toAbstractIds) {
 		var countSymbol = modelStore.getSymbolByName(COUNT_SYMBOL_NAME);
 		if (countSymbol == null) {
 			throw new IllegalStateException(COUNT_SYMBOL_NAME + " symbol not found in model store");
@@ -235,7 +251,7 @@ public class GraphDiffCrossover implements Variation {
 
 		// 2) Collect last newValue for created nodes and nodes to be abstracted (per key) by scanning COUNT diffs and overwriting entries.
 		var nodesToUpdateCount = new HashSet<Integer>(nodeChanges.createdNodes);
-		nodesToUpdateCount.addAll(idsToBeAbstracted);
+		nodesToUpdateCount.addAll(toAbstractIds);
 		Map<Tuple, Object> newCountValues = collectNewCountForNodes((Symbol<?>) countSymbol, nodesToUpdateCount);
 
 		// 3) Apply collected last values to the interpretation.
@@ -265,7 +281,7 @@ public class GraphDiffCrossover implements Variation {
 		return getDeltasOfAnySymbolWithIgnoreAndAbstraction(anySymbol, interpretation, null, null);
 	}
 
-	private List<MapDelta<Tuple, ?>> getDeltasOfAnySymbolWithIgnoreAndAbstraction(AnySymbol anySymbol, AnyInterpretation interpretation, Set<Integer> idsToBeIgnored, Set<Integer> idsToBeAbstractedOrDeleted) {
+	private List<MapDelta<Tuple, ?>> getDeltasOfAnySymbolWithIgnoreAndAbstraction(AnySymbol anySymbol, AnyInterpretation interpretation, Set<Integer> toIgnoreIds, Set<Integer> toAbstractOrDeletedIds) {
 		if (!(interpretation instanceof Interpretation<?>)) {
 			throw new IllegalStateException(anySymbol.name()+" symbol interpretation is not of type Interpretation");
 		}
@@ -276,18 +292,18 @@ public class GraphDiffCrossover implements Variation {
 		while (cursor.move()) {
 			Tuple key = cursor.getKey();
 
-			if(isAnyIdOfKeyInSet(key, idsToBeIgnored)) {
+			if(isAnyIdOfKeyInSet(key, toIgnoreIds)) {
 				continue;
 			}
-			else if(isAnyIdOfKeyInSet(key, idsToBeAbstractedOrDeleted)) {
+			else if(isAnyIdOfKeyInSet(key, toAbstractOrDeletedIds)) {
 				try {
 					@SuppressWarnings("unchecked")
-					Interpretation<TruthValue> tvInterp = (Interpretation<TruthValue>) interpretation;
-					tvInterp.put(key, TruthValue.UNKNOWN);
+					Interpretation<TruthValue> tvInterpretation = (Interpretation<TruthValue>) interpretation;
+					tvInterpretation.put(key, TruthValue.UNKNOWN);
 				} catch (ClassCastException e) {
 					@SuppressWarnings("unchecked")
-					Interpretation<Object> objInterp = (Interpretation<Object>) interpretation;
-					objInterp.put(key, null); // might check some other types as well (int, bool etc.)
+					Interpretation<Object> objInterpretation = (Interpretation<Object>) interpretation;
+					objInterpretation.put(key, null); // might check some other types as well (int, bool etc.)
 				}
 			}
 			else {
