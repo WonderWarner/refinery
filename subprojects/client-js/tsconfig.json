@@ -12,13 +12,12 @@
     "outDir": "build/typescript",
     "paths": {
       "@tools.refinery/client": ["./src/index.ts"],
-      "@tools.refinery/client/chat": ["./src/chat/index.ts"],
+      "@tools.refinery/client/chat": ["./src/chat/index.ts"]
     }
   },
   "include": [
     "src/**/*.ts",
     "vite.config.ts",
-    "vitest.config.ts",
-    "vitest.workspace.ts"
+    "vitest.config.ts"
   ]
 }
