@@ -11,7 +11,7 @@ import tools.refinery.store.map.Version;
 
 import java.util.Objects;
 
-class VersionVariable extends AbstractVariable {
+public class VersionVariable extends AbstractVariable {
 	private final transient RefineryProblem problem;
 	private transient Version version;
 

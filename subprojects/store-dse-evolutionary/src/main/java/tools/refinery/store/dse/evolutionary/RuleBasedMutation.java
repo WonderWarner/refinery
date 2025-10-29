@@ -21,6 +21,11 @@ class RuleBasedMutation implements Mutation {
         isVisualizationEnabled = visualizationStore != null;
     }
 
+	public void setRandomSeed(long seed) {
+		this.random.setSeed(seed);
+	}
+
+	//TODO check if mutation is possible even if constraints are harmed
     @Override
     public Solution mutate(Solution parent) {
         var child = parent.copy();
@@ -62,7 +67,7 @@ class RuleBasedMutation implements Mutation {
         }
 
         if (isVisualizationEnabled && childVersion != null) {
-            visualizationStore.addState(childVersion, problem.getDSEAdapter().getObjectiveValue().toString());
+            visualizationStore.addState(childVersion, problem.getObjectiveValue().toString());
             visualizationStore.addTransition(version, childVersion,
                     "fire: " + transformationNum + ", " + activation);
         }

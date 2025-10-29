@@ -29,7 +29,7 @@ public class DeltaCrossover implements Variation {
 	private final VisualizationStore visualizationStore;
 	private final boolean isVisualizationEnabled;
 	private ModelDiffCursor diffCursor;
-	private final double deltaSelectionRatio;
+	private double deltaSelectionRatio;
 
 	public DeltaCrossover(RefineryProblem problem, double deltaSelectionRatio) {
 		this.problem = problem;
@@ -46,6 +46,13 @@ public class DeltaCrossover implements Variation {
 
 	public void setRandomSeed(long seed) {
 		random.setSeed(seed);
+	}
+
+	public void setDeltaSelectionRatio(double ratio) {
+		if(ratio <= 0.0 || ratio >= 1.0) {
+			throw new IllegalArgumentException("Inclusion of differences ratio must be between 0 and 1");
+		}
+		this.deltaSelectionRatio = ratio;
 	}
 
 	@Override
@@ -108,7 +115,7 @@ public class DeltaCrossover implements Variation {
 		RefineryProblem.setVersion(child, childVersion);
 
 		if (isVisualizationEnabled) {
-			visualizationStore.addState(childVersion, problem.getDSEAdapter().getObjectiveValue().toString());
+			visualizationStore.addState(childVersion, problem.getObjectiveValue().toString());
 			visualizationStore.addTransition(version1, childVersion, Double.toString(1- deltaSelectionRatio));
 			visualizationStore.addTransition(version1, childVersion, Double.toString(deltaSelectionRatio));
 		}

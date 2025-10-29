@@ -86,7 +86,7 @@ public sealed interface IntBound {
 
 			@Override
 			public String toString() {
-				return "∞";
+				return "INF";
 			}
 
 			@Override
@@ -140,7 +140,7 @@ public sealed interface IntBound {
 
 			@Override
 			public String toString() {
-				return "-∞";
+				return "NEG_INF";
 			}
 
 			@Override
@@ -167,6 +167,9 @@ public sealed interface IntBound {
 
 		@Override
 		public boolean lessThanOrEquals(IntBound other) {
+			if (other == null) {
+				System.out.println("other is null");
+			}
 			return switch (other) {
 				case Infinite.POSITIVE_INFINITY -> true;
 				case Infinite.NEGATIVE_INFINITY -> false;
@@ -206,6 +209,9 @@ public sealed interface IntBound {
 
 		@Override
 		public IntBound sub(IntBound other, RoundingMode roundingMode) {
+			if (other == null) {
+				System.out.println("other is null");
+			}
 			return switch (other) {
 				case Infinite.POSITIVE_INFINITY -> Infinite.NEGATIVE_INFINITY;
 				case Infinite.NEGATIVE_INFINITY -> Infinite.POSITIVE_INFINITY;

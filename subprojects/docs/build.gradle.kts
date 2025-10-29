@@ -39,12 +39,8 @@ dependencies {
 		for (subproject in rootProject.subprojects) {
 			if (subproject.plugins.hasPlugin(JavaBasicLibraryPlugin::class)) {
 				javadocs(project(subproject.path, "javadocElements"))
-				// Remove this once Store DSE Evolutionary has been released.
 				if (subproject.name != "refinery-store-dse-evolutionary") {
-					var isInterpreter = subproject.name.startsWith("refinery-interpreter")
-					val releasedGroup = if (isInterpreter) interpreterGroup else subproject.group
-					val releasedProjectVersion = if (isInterpreter) releasedInterpreterVersion else releasedVersion
-					releasedJavadocs("${releasedGroup}:${subproject.name}:$releasedProjectVersion:javadoc@jar")
+					releasedJavadocs("${subproject.group}:${subproject.name}:$releasedVersion:javadoc@jar")
 				}
 			}
 		}

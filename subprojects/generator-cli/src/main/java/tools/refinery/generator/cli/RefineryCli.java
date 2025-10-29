@@ -9,10 +9,7 @@ import com.beust.jcommander.JCommander;
 import com.google.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import tools.refinery.generator.cli.commands.CheckCommand;
-import tools.refinery.generator.cli.commands.Command;
-import tools.refinery.generator.cli.commands.ConcretizeCommand;
-import tools.refinery.generator.cli.commands.GenerateCommand;
+import tools.refinery.generator.cli.commands.*;
 import tools.refinery.generator.standalone.StandaloneRefinery;
 
 import java.io.IOException;
@@ -32,6 +29,9 @@ public class RefineryCli {
 
 	@Inject
 	private GenerateCommand generateCommand;
+
+	@Inject
+	private EvolveCommand evolveCommand;
 
 	private JCommander jCommander;
 
@@ -62,6 +62,7 @@ public class RefineryCli {
 					.addCommand("generate", generateCommand, "g")
 					.addCommand("check", checkCommand)
 					.addCommand("concretize", concretizeCommand)
+					.addCommand("evolve", evolveCommand, "moea")
 					.build();
 		}
 		return jCommander;

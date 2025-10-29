@@ -1,0 +1,87 @@
+import builtin::view.
+
+@color(hex="#beaed4")
+abstract class SocialBeing {
+ 	SocialBeing[] friend
+}
+@color(hex="#377eb8")
+class Person extends SocialBeing {
+    Dog[] pet opposite owner
+}
+@color(hex="#e5c494")
+class Dog extends SocialBeing {
+    Person owner opposite pet
+}
+
+% Noone should be their own friends
+propagation rule noSelf(a) ==> !friend(a,a).
+
+% A pet and it's owner should be true friends
+pred trueFriends(SocialBeing sb1, SocialBeing sb2) <->
+    friend(sb1, sb2),
+    friend(sb2, sb1).
+
+pred ownerAndPetAreNotFriends(Person p, Dog d) <->
+    pet(p, d),
+    !trueFriends(p, d).
+
+int violation1() =
+    count{ownerAndPetAreNotFriends(_, _)}.
+
+error pred tooManyViolations() <->
+    violation1() > 3.
+
+% A Person is good to have 2..5 true friends
+int numberOfFriends(SocialBeing sb) =
+    count { trueFriends(sb, _) }.
+
+pred tooManyFriends(Person p) <->
+    numberOfFriends(p) > 5.
+
+int howManyPeopleHaveTooManyFriends() =
+    count { tooManyFriends(_) }.
+
+pred notEnoughFriends(Person p) <->
+    numberOfFriends(p) < 2.
+
+int howManyPeopleHaveNotEnoughFriends() =
+    count { notEnoughFriends(_) }.
+
+int objective1() =
+    howManyPeopleHaveTooManyFriends() + howManyPeopleHaveNotEnoughFriends().
+
+% It is good to have cliques but not only in a triangle
+pred friendTriangle(SocialBeing sb1, SocialBeing sb2, SocialBeing sb3) <->
+    trueFriends(sb1, sb2),
+    trueFriends(sb2, sb3),
+    trueFriends(sb3, sb1).
+
+pred friendOfAllThreeSocialBeing(SocialBeing sb1, SocialBeing sb2, SocialBeing sb3) <->
+    trueFriends(sb, sb1),
+    trueFriends(sb, sb2),
+    trueFriends(sb, sb3).
+
+pred beingInFriendTriangleWithoutBiggerClique(SocialBeing sb1) <->
+    friendTriangle(sb1, _, _),
+    !beingInAtLeastFourSizedClique(sb1).
+
+int numberOfBeingsInFriendTriangles() =
+    count { beingInFriendTriangleWithoutBiggerClique(_) }.
+
+pred beingInAtLeastFourSizedClique(SocialBeing sb1) <->
+    friendTriangle(sb1, sb2, sb3),
+    friendOfAllThreeSocialBeing(sb1, sb2, sb3).
+
+int numberOfBeingsInBiggerCliques() =
+    count { beingInAtLeastFourSizedClique(_) }.
+
+% TODO *..-2147483648 (?)
+int objective2() =
+    10.%numberOfBeingsInFriendTriangles() + numberOfBeingsInBiggerCliques().
+
+friend(x,y).
+friend(x,z).
+Person(y).
+!friend(y,x).
+
+scope node = 10..15.

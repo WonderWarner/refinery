@@ -37,10 +37,11 @@ public class ConcreteModelFacade extends ModelFacadeImpl {
 	public <A extends AbstractValue<A, C>, C> PartialInterpretation<A, C> getPartialInterpretation(
 			PartialSymbol<A, C> partialSymbol) {
 		var partialInterpretation = super.getPartialInterpretation(partialSymbol);
-		if (keepNonExistingObjects || ReasoningAdapter.EXISTS_SYMBOL.equals(partialSymbol)) {
-			return partialInterpretation;
-		}
-		return FilteredInterpretation.of(partialInterpretation, existsInterpretation);
+		return partialInterpretation;
+//		if (keepNonExistingObjects || ReasoningAdapter.EXISTS_SYMBOL.equals(partialSymbol)) {
+//			return partialInterpretation;
+//		}
+//		return FilteredInterpretation.of(partialInterpretation, existsInterpretation);
 	}
 
 	@Override

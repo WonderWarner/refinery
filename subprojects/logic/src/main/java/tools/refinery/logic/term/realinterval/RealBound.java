@@ -128,7 +128,7 @@ public sealed interface RealBound {
 
 			@Override
 			public String toString() {
-				return "∞";
+				return "INF";
 			}
 
 			@Override
@@ -207,7 +207,7 @@ public sealed interface RealBound {
 
 			@Override
 			public String toString() {
-				return "-∞";
+				return "NEG_INF";
 			}
 
 			@Override

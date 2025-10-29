@@ -19,6 +19,7 @@ import tools.refinery.store.dse.propagation.PropagationAdapter;
 import tools.refinery.store.map.Version;
 import tools.refinery.store.map.internal.delta.MapDelta;
 import tools.refinery.store.model.*;
+import tools.refinery.store.reasoning.interpretation.PartialInterpretation;
 import tools.refinery.store.reasoning.translator.typehierarchy.InferredType;
 import tools.refinery.store.representation.AnySymbol;
 import tools.refinery.store.representation.Symbol;
@@ -94,6 +95,17 @@ public class GenerateCommand implements Command {
 			generator.setRandomSeed(randomSeed);
 			generator.setMaxNumberOfSolutions(count);
 			generator.generate();
+			var problemTrace = generator.getProblemTrace();
+			var partialFunction = problemTrace.getPartialFunction("objective2");
+			var anyPartialInterpretation = generator.getPartialInterpretation(partialFunction);
+			var partialInterpretation = (PartialInterpretation<?,?>) anyPartialInterpretation;
+			var functionCursor = partialInterpretation.getAll();
+			while (functionCursor.move()) {
+				Tuple key = functionCursor.getKey();
+				Object value = functionCursor.getValue();
+				System.out.println("Key: " + key + ", Value: " + value);
+			}
+
 			if (count == 1) {
 				serializer.saveModel(generator, outputPath);
 			} else {
@@ -174,6 +186,9 @@ public class GenerateCommand implements Command {
 				abstractIdsOfVersion1 = abstractIdsOfVersion2;
 				abstractIdsOfVersion2 = tempIds;
 			}
+
+			var symbols = modelStore.getSymbols();
+			var tooManyFriendSymbol = modelStore.getSymbolByName("howManyPeopleHaveTooManyFriends");
 
 			// preserveIds will be kept from version1 and should be ignored when applying diffs
 			var preserveIds = new HashSet<Integer>();
