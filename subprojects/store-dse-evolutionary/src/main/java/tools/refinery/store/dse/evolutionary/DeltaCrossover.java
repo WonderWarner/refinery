@@ -19,8 +19,6 @@ public class DeltaCrossover implements Variation {
 
 	private static final String TYPE_SYMBOL_NAME = "TYPE";
 	private static final String COUNT_SYMBOL_NAME = "COUNT";
-	private static final String MODEL_SIZE_SYMBOL_NAME = "MODEL_SIZE";
-	private static final String CONTAINS_SYMBOL_NAME = "CONTAINS";
 	private static final Random random = new Random();
 
 	private final RefineryProblem problem;
@@ -30,13 +28,16 @@ public class DeltaCrossover implements Variation {
 	private final boolean isVisualizationEnabled;
 	private ModelDiffCursor diffCursor;
 	private double deltaSelectionRatio;
+	private List<Symbol<?>> crossoverSymbols;
 
-	public DeltaCrossover(RefineryProblem problem, double deltaSelectionRatio) {
+	public DeltaCrossover(RefineryProblem problem, double deltaSelectionRatio,
+						  List<Symbol<?>> crossoverSymbols) {
 		this.problem = problem;
 		if(deltaSelectionRatio <= 0.0 || deltaSelectionRatio >= 1.0) {
 			throw new IllegalArgumentException("Inclusion of differences ratio must be between 0 and 1");
 		}
 		this.deltaSelectionRatio = deltaSelectionRatio;
+		this.crossoverSymbols = crossoverSymbols;
 		this.model = problem.getModel();
 		this.modelStore = model.getStore();
 		visualizationStore = problem.getVisualizationStore();
@@ -148,26 +149,23 @@ public class DeltaCrossover implements Variation {
 		var nodeChanges = mergeNodesAndReturnDeletedIds(toPreserveIds, toAbstractIds);
 
 		// Handling edges and attributes
-		for (var anySymbol : modelStore.getSymbols()) {
-			if(anySymbol.name().equals(TYPE_SYMBOL_NAME) || anySymbol.name().equals(COUNT_SYMBOL_NAME)
-					|| anySymbol.name().equals(MODEL_SIZE_SYMBOL_NAME) || anySymbol.name().equals(CONTAINS_SYMBOL_NAME)) {
-				continue;
-			}
-			var anyInterpretation = model.getInterpretation(anySymbol);
+		for (var symbol : crossoverSymbols) {
+			var anyInterpretation = model.getInterpretation(symbol);
 
 			var toDeleteOrAbstractIds = new HashSet<>(nodeChanges.deletedNodes);
 			toDeleteOrAbstractIds.addAll(toAbstractIds);
 			var toPreserveOrIgnoreIds = new HashSet<>(toPreserveIds);
 			toPreserveOrIgnoreIds.addAll(nodeChanges.nodesToIgnore);
 
-			var deltas = getDeltasOfAnySymbolWithIgnoreAndAbstraction(anySymbol, anyInterpretation, toPreserveOrIgnoreIds, toDeleteOrAbstractIds);
+			var deltas = getDeltasOfAnySymbolWithIgnoreAndAbstraction(symbol, anyInterpretation,
+					toPreserveOrIgnoreIds, toDeleteOrAbstractIds);
 			Collections.shuffle(deltas, random);
 			int limit = (int) (deltas.size() * deltaSelectionRatio);
 			var interpretation = castInterpretation(anyInterpretation);
 
 			for (int i = 0; i < limit; i++) {
 				var d = deltas.get(i);
-				System.out.println("Applying change to " + anySymbol.name() + " at " + d.getKey() +
+				System.out.println("Applying change to " + symbol.name() + " at " + d.getKey() +
 						" from " + d.getOldValue() + " to " + d.getNewValue());
 				interpretation.put(d.getKey(), d.getNewValue());
 			}

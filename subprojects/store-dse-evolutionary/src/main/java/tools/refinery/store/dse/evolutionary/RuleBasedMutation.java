@@ -25,7 +25,6 @@ class RuleBasedMutation implements Mutation {
 		this.random.setSeed(seed);
 	}
 
-	//TODO check if mutation is possible even if constraints are harmed
     @Override
     public Solution mutate(Solution parent) {
         var child = parent.copy();

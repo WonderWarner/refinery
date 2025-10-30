@@ -324,7 +324,7 @@ class CRAExamplesTest {
 		var initialVersion = model.commit();
 		queryEngine.flushChanges();
 
-		RefineryProblem problem = new RefineryProblem(store, null, initialVersion, 5);
+		RefineryProblem problem = new RefineryProblem(store, initialVersion, null, null, null, 5);
 		NSGAII algorithm = new NSGAII(problem);
 		var variation = new CompoundVariation(
 				problem.getCrossover(),

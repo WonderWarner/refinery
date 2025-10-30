@@ -3,6 +3,7 @@ package tools.refinery.generator.cli.commands;
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.Parameters;
 import com.google.inject.Inject;
+import org.eclipse.emf.common.util.EList;
 import org.moeaframework.algorithm.NSGAII;
 import org.moeaframework.core.Solution;
 import org.moeaframework.core.operator.CompoundVariation;
@@ -12,15 +13,18 @@ import tools.refinery.generator.cli.RefineryCli;
 import tools.refinery.generator.cli.utils.CliProblemLoader;
 import tools.refinery.generator.cli.utils.CliProblemSerializer;
 import tools.refinery.generator.cli.utils.CliUtils;
+import tools.refinery.language.model.problem.*;
 import tools.refinery.store.dse.evolutionary.RefineryProblem;
 import tools.refinery.store.dse.evolutionary.VersionVariable;
 import tools.refinery.store.map.Version;
 import tools.refinery.store.model.Model;
 import tools.refinery.store.query.ModelQueryAdapter;
+import tools.refinery.store.reasoning.representation.PartialFunction;
+import tools.refinery.store.reasoning.representation.PartialSymbol;
+import tools.refinery.visualization.ModelVisualizerAdapter;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 @Parameters(commandDescription = "Generate Solutions from a partial model via evolutionary algorithm")
 public class EvolveCommand implements Command {
@@ -55,12 +59,14 @@ public class EvolveCommand implements Command {
 		this.randomSeed = randomSeed;
 	}
 
-	@Parameter(names = {"-delta-selection-ratio", "-d"}, description = "Delta selection ratio of Crossover operation")
-	public void setDeltaSelectionRatio(double deltaSelectionRatio) {
-		if (deltaSelectionRatio < 0 || deltaSelectionRatio > 1) {
+	@Parameter(names = {"-delta-selection-percent", "-d"}, description = "Delta selection percent of Crossover " +
+			"operation")
+	public void setDeltaSelectionRatio(long deltaSelectionPercent) {
+		double ratio = deltaSelectionPercent / 100.0;
+		if (ratio < 0 || ratio > 1) {
 			throw new IllegalArgumentException("Ratio must be between 0 and 1");
 		}
-		this.deltaSelectionRatio = deltaSelectionRatio;
+		this.deltaSelectionRatio = ratio;
 	}
 
 	@Override
@@ -69,20 +75,44 @@ public class EvolveCommand implements Command {
 			throw new IllegalArgumentException("Must provide output path");
 		}
 		var problem = loader.loadProblem(inputPath, scopes, new ArrayList<>());
+		var statements = problem.getStatements();
+
+		var crossoverRelations = new ArrayList<Relation>();
+		var objectiveRelations = new ArrayList<Relation>();
+		Relation violationCountRelation = getAnnotatedRelations(statements, crossoverRelations, objectiveRelations);
+
 		generatorFactory.partialInterpretationBasedNeighborhoods(true);
 		try (var generator = generatorFactory.createGenerator(problem)) {
 			generator.setRandomSeed(randomSeed);
-			generator.setMaxNumberOfSolutions(10000);
+			generator.setMaxNumberOfSolutions(100);
 
 			Model model = generator.getModel();
 			var queryEngine = model.getAdapter(ModelQueryAdapter.class);
 			var store = model.getStore();
 			var problemTrace = generator.getProblemTrace();
 
+			var crossoverSymbols = new ArrayList<PartialSymbol<?,?>>();
+			var objectiveFunctions = new ArrayList<PartialFunction<?,?>>();
+			PartialFunction<?,?> violationFunction = null;
+			for(var relation : crossoverRelations) {
+				crossoverSymbols.add(problemTrace.getPartialRelation(relation));
+			}
+			for(var function : objectiveRelations) {
+				objectiveFunctions.add((PartialFunction<?,?>) problemTrace.getPartialFunction(function));
+			}
+			if(violationCountRelation != null) {
+				violationFunction = (PartialFunction<?,?>) problemTrace.getPartialFunction(violationCountRelation);
+			}
+
 			var initialVersion = model.commit();
 			queryEngine.flushChanges();
 
-			RefineryProblem moeaProblem = new RefineryProblem(store, problemTrace, initialVersion, 20);
+			RefineryProblem moeaProblem = new RefineryProblem(store, initialVersion, crossoverSymbols,
+					objectiveFunctions, violationFunction, 10, true);
+			var visualizer = model.getAdapter(ModelVisualizerAdapter.class);
+			if (visualizer != null) {
+				visualizer.visualize(moeaProblem.getVisualizationStore());
+			}
 			moeaProblem.setDeltaSelectionRatio(deltaSelectionRatio);
 			moeaProblem.setRandomSeed(randomSeed);
 
@@ -91,11 +121,11 @@ public class EvolveCommand implements Command {
 					moeaProblem.getCrossover(),
 					moeaProblem.getMutation()
 			);
-
 			algorithm.setVariation(variation);
-			algorithm.setInitialPopulationSize(100);
+			algorithm.setInitialPopulationSize(10);
 
-			algorithm.run(10000);
+			algorithm.run(100);
+
 			NondominatedPopulation result = algorithm.getResult();
 			result.display();
 
@@ -108,5 +138,37 @@ public class EvolveCommand implements Command {
 			}
 		}
 		return RefineryCli.EXIT_SUCCESS;
+	}
+
+	private Relation getAnnotatedRelations(EList<Statement> statements, ArrayList<Relation> crossoverRelations,
+									   ArrayList<Relation> objectiveRelations) {
+		Relation violationCountRelation = null;
+		for(var statement: statements) {
+			if(statement instanceof AnnotatedElement element) {
+				var container = element.getAnnotations();
+				for(var annotation : container.getAnnotations()) {
+					var annotationName = annotation.getDeclaration().getName();
+					if(annotationName.equals("crossover")) {
+						//TODO set classCrossover to true if needed
+					}
+					else if(annotationName.equals("objective")) {
+						objectiveRelations.add((Relation) statement);
+					}
+					else if(annotationName.equals("violationCount")) {
+						violationCountRelation = (Relation) statement;
+					}
+				}
+			}
+			if (statement instanceof ClassDeclaration classDeclaration) {
+				for(var featureDeclaration : classDeclaration.getFeatureDeclarations()) {
+					for(var featureAnnotation : featureDeclaration.getAnnotations().getAnnotations()) {
+						if(featureAnnotation.getDeclaration().getName().equals("crossover")) {
+							crossoverRelations.add(featureDeclaration);
+						}
+					}
+				}
+			}
+		}
+		return violationCountRelation;
 	}
 }

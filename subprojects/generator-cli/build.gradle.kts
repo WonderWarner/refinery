@@ -9,6 +9,7 @@ plugins {
 }
 
 dependencies {
+	implementation(project(":refinery-store-dse-evolutionary"))
 	implementation(project(":refinery-generator"))
 	implementation(libs.jcommander)
 	implementation(libs.slf4j)

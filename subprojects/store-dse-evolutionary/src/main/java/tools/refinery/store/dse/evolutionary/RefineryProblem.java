@@ -1,71 +1,97 @@
 package tools.refinery.store.dse.evolutionary;
 
-import org.apache.commons.lang3.NotImplementedException;
 import org.jetbrains.annotations.Nullable;
 import org.moeaframework.core.Solution;
 import org.moeaframework.core.constraint.LessThanOrEqual;
 import org.moeaframework.core.operator.Mutation;
 import org.moeaframework.core.operator.Variation;
 import org.moeaframework.problem.AbstractProblem;
-import tools.refinery.language.semantics.ProblemTrace;
+import tools.refinery.logic.term.intinterval.IntBound;
+import tools.refinery.logic.term.intinterval.IntInterval;
 import tools.refinery.store.dse.propagation.PropagationAdapter;
 import tools.refinery.store.dse.transition.DesignSpaceExplorationAdapter;
-import tools.refinery.store.dse.transition.DesignSpaceExplorationStoreAdapter;
 import tools.refinery.store.dse.transition.ObjectiveValue;
+import tools.refinery.store.dse.transition.ObjectiveValues;
 import tools.refinery.store.map.Version;
 import tools.refinery.store.model.Model;
 import tools.refinery.store.model.ModelStore;
+import tools.refinery.store.reasoning.ReasoningAdapter;
+import tools.refinery.store.reasoning.interpretation.PartialInterpretation;
+import tools.refinery.store.reasoning.literal.Concreteness;
+import tools.refinery.store.reasoning.representation.PartialFunction;
+import tools.refinery.store.reasoning.representation.PartialSymbol;
+import tools.refinery.store.representation.Symbol;
 import tools.refinery.visualization.statespace.VisualizationStore;
 import tools.refinery.visualization.statespace.internal.VisualizationStoreImpl;
+
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 
 public class RefineryProblem extends AbstractProblem {
     public static final int DEFAULT_RANDOMIZE_DEPTH = 1;
     public static final boolean DEFAULT_VISUALIZATION_ENABLED = false;
+	public static final int ALLOWED_NUMBER_OF_VIOLATIONS = 5;
 
     private final Model model;
-	private final ProblemTrace problemTrace;
     private final Version initialVersion;
     private final VisualizationStore visualizationStore;
     private final int randomizeDepth;
     private final DesignSpaceExplorationAdapter dseAdapter;
     private final @Nullable PropagationAdapter propagationAdapter;
-    private RuleBasedMutation ruleBasedMutation;
-    private DeltaCrossover deltaCrossover ;
+    private final RuleBasedMutation ruleBasedMutation;
+    private final DeltaCrossover deltaCrossover ;
 
-    public RefineryProblem(ModelStore store, ProblemTrace problemTrace, Version initialVersion) {
-        this(store, problemTrace, initialVersion, DEFAULT_RANDOMIZE_DEPTH, DEFAULT_VISUALIZATION_ENABLED);
+	private final List<PartialInterpretation<?,?>> objectiveInterpretations = new ArrayList<>();
+	private final PartialInterpretation<?,?> violationInterpretation;
+
+    public RefineryProblem(ModelStore store, Version initialVersion, List<PartialSymbol<?,?>> crossoverSymbols,
+						   List<PartialFunction<?,?>> objectiveFunctions, PartialFunction<?,?> violationFunction ) {
+        this(store, initialVersion, crossoverSymbols, objectiveFunctions, violationFunction, DEFAULT_RANDOMIZE_DEPTH,
+				DEFAULT_VISUALIZATION_ENABLED);
     }
 
-    public RefineryProblem(ModelStore store,  ProblemTrace problemTrace, Version initialVersion,
+    public RefineryProblem(ModelStore store, Version initialVersion, List<PartialSymbol<?,?>> crossoverSymbols,
+						   List<PartialFunction<?,?>> objectiveFunctions, PartialFunction<?,?> violationFunction,
 						   boolean isVisualizationEnabled) {
-        this(store, problemTrace, initialVersion, DEFAULT_RANDOMIZE_DEPTH, isVisualizationEnabled);
+        this(store, initialVersion, crossoverSymbols, objectiveFunctions, violationFunction, DEFAULT_RANDOMIZE_DEPTH,
+				isVisualizationEnabled);
     }
 
-    public RefineryProblem(ModelStore store,  ProblemTrace problemTrace, Version initialVersion, int randomizeDepth) {
-        this(store, problemTrace, initialVersion, randomizeDepth, DEFAULT_VISUALIZATION_ENABLED);
+    public RefineryProblem(ModelStore store, Version initialVersion, List<PartialSymbol<?,?>> crossoverSymbols,
+						   List<PartialFunction<?,?>> objectiveFunctions, PartialFunction<?,?> violationFunction,
+						   int randomizeDepth) {
+        this(store, initialVersion, crossoverSymbols, objectiveFunctions, violationFunction, randomizeDepth,
+				DEFAULT_VISUALIZATION_ENABLED);
     }
 
-    public RefineryProblem(ModelStore store, ProblemTrace problemTrace, Version initialVersion, int randomizeDepth,
-						   boolean isVisualizationEnabled) {
-        super(1, store.getAdapter(DesignSpaceExplorationStoreAdapter.class).getObjectives().size(), 1);
+    public RefineryProblem(ModelStore store, Version initialVersion, List<PartialSymbol<?,?>> crossoverSymbols,
+						   List<PartialFunction<?,?>> objectiveFunctions, PartialFunction<?,?> violationFunction,
+						   int randomizeDepth, boolean isVisualizationEnabled) {
+        super(1, objectiveFunctions.size(), 1);
         if (randomizeDepth < 0) {
             throw new IllegalArgumentException("randomizeDepth must be positive or zero");
         }
         model = store.createEmptyModel();
-		this.problemTrace = problemTrace;
         this.initialVersion = initialVersion;
+
         if (isVisualizationEnabled) visualizationStore = new VisualizationStoreImpl();
         else visualizationStore = null;
         this.randomizeDepth = randomizeDepth;
-        dseAdapter = model.getAdapter(DesignSpaceExplorationAdapter.class);
+
+		dseAdapter = model.getAdapter(DesignSpaceExplorationAdapter.class);
         propagationAdapter = model.tryGetAdapter(PropagationAdapter.class).orElse(null);
-        ruleBasedMutation = new RuleBasedMutation(this);
-        deltaCrossover = new DeltaCrossover(this, 0.3);
 
-		//TODO collect objective function names, constraint function names, crossover predicate names
-		// create getters and accept method
-		// set objective and constraint values according to it
+		var reasoningAdapter = model.getAdapter(ReasoningAdapter.class);
+		for(var objFun: objectiveFunctions) {
+			this.objectiveInterpretations.add(reasoningAdapter.getPartialInterpretation(Concreteness.CANDIDATE, objFun));
+		}
+		this.violationInterpretation = reasoningAdapter.getPartialInterpretation(Concreteness.PARTIAL, violationFunction);
 
+		var selectedSymbols = toSymbols(store, crossoverSymbols);
+
+		ruleBasedMutation = new RuleBasedMutation(this);
+		deltaCrossover = new DeltaCrossover(this, 0.3, selectedSymbols);
     }
 
     public VisualizationStore getVisualizationStore() {
@@ -91,50 +117,80 @@ public class RefineryProblem extends AbstractProblem {
 
     @Override
     public void evaluate(Solution solution) {
-		//TODO exchange to
         var version = getVersion(solution);
         if (version == null) {
             setInfeasible(solution);
             return;
         }
         model.restore(version);
-        if (dseAdapter.checkExclude()) {
-            setInfeasible(solution);
-            return;
-        }
+
+		Integer constraintCount = getConstraintCount();
+		if (constraintCount == null || constraintCount > ALLOWED_NUMBER_OF_VIOLATIONS) {
+			setInfeasible(solution);
+			return;
+		}
+
         if (propagationAdapter != null && propagationAdapter.concretizationRequested()) {
             var concretizationResult = propagationAdapter.concretize();
-            if (concretizationResult.isRejected() || dseAdapter.checkExclude()) {
+			constraintCount = getConstraintCount();
+            if (concretizationResult.isRejected() || constraintCount == null || constraintCount > ALLOWED_NUMBER_OF_VIOLATIONS) {
                 setInfeasible(solution);
                 return;
             }
         }
 
-        var objectiveValue = dseAdapter.getObjectiveValue();
-        for (int i = 0; i < numberOfObjectives; i++) {
-            solution.setObjectiveValue(i, objectiveValue.get(i));
-        }
+		setObjectiveValues(solution);
+		solution.setConstraintValue(0, constraintCount);
 
         if (visualizationStore != null && dseAdapter.checkAccept()) {
             visualizationStore.addSolution(version);
         }
-
-        solution.setConstraintValue(0,
-                dseAdapter.checkAccept() ? 0.0 : 0.0); //TODO
     }
 
     private void setInfeasible(Solution solution) {
-        for (int i = 0; i < numberOfObjectives; i++) {
-            solution.setObjectiveValue(i, Double.POSITIVE_INFINITY);
-        }
-        solution.setConstraintValue(0, 0.0);
+		for (int i = 0; i < numberOfObjectives; i++) {
+			solution.setObjectiveValue(i, Double.POSITIVE_INFINITY);
+		}
+        solution.setConstraintValue(0, Double.POSITIVE_INFINITY);
     }
+
+	private Integer getConstraintCount() {
+		var cursor = violationInterpretation.getAll();
+		if (cursor.move())
+		{
+			IntInterval interval = (IntInterval) cursor.getValue();
+			return getLowerValueOrNull(interval);
+		}
+		return null;
+	}
+
+	private void setObjectiveValues(Solution solution) {
+		for (int i = 0; i < numberOfObjectives; i++) {
+			var objectiveInterpretation =  objectiveInterpretations.get(i);
+			var cursor = objectiveInterpretation.getAll();
+			if(cursor.move()) {
+				IntInterval interval = (IntInterval) cursor.getValue();
+				var value = getLowerValueOrNull(interval);
+				if (value == null) solution.setObjectiveValue(i, Double.POSITIVE_INFINITY);
+				else solution.setObjectiveValue(i, value);
+			}
+			else solution.setObjectiveValue(i, Double.POSITIVE_INFINITY);
+		}
+	}
+
+	private Integer getLowerValueOrNull(IntInterval interval) {
+		IntBound number = interval.lowerBound();
+		if (number instanceof IntBound.Finite finite) {
+			return finite.value();
+		}
+		return null;
+	}
 
     @Override
     public Solution newSolution() {
         var solution = new Solution(numberOfVariables, numberOfObjectives, numberOfConstraints);
         solution.setVariable(0, new VersionVariable(this, initialVersion));
-        solution.setConstraint(0, new LessThanOrEqual(0.0));
+        solution.setConstraint(0, new LessThanOrEqual(ALLOWED_NUMBER_OF_VIOLATIONS));
 
         if (visualizationStore != null) {
             visualizationStore.addState(getVersion(solution), dseAdapter.getObjectiveValue().toString());
@@ -180,6 +236,59 @@ public class RefineryProblem extends AbstractProblem {
 	}
 
 	public ObjectiveValue getObjectiveValue() {
-		throw new NotImplementedException("TODO");
+		double[] values = new double[numberOfObjectives];
+		for (int i = 0; i < numberOfObjectives; i++) {
+			var objectiveInterpretation =  objectiveInterpretations.get(i);
+			var cursor = objectiveInterpretation.getAll();
+			if(cursor.move()) {
+				IntInterval interval = (IntInterval) cursor.getValue();
+				var value = getLowerValueOrNull(interval);
+				if (value == null) values[i] = Double.POSITIVE_INFINITY;
+				else values[i] = value;
+			}
+			else values[i] = Double.POSITIVE_INFINITY;
+		}
+		return new ObjectiveValues.ObjectiveValueN(values);
+	}
+
+	public static List<Symbol<?>> toSymbols(ModelStore store, List<PartialSymbol<?,?>> partialSymbols) {
+		List<Symbol<?>> symbols = new ArrayList<>();
+		for(var partialSymbol: partialSymbols) {
+			Symbol<?> symbol = tryExtractSymbol(partialSymbol);
+			if (symbol == null) {
+				String name = tryExtractName(partialSymbol);
+				if (name != null) {
+					symbol = (Symbol<?>) store.getSymbolByName(name);
+				}
+			}
+			if (symbol != null) {
+				symbols.add(symbol);
+			}
+		}
+		return symbols;
+	}
+
+	private static Symbol<?> tryExtractSymbol(PartialSymbol<?,?> p) {
+		try {
+			Method m = p.getClass().getMethod("getSymbol");
+			Object o = m.invoke(p);
+			if (o instanceof Symbol) return (Symbol<?>) o;
+		} catch (Exception ignored) {}
+		return null;
+	}
+
+	private static String tryExtractName(PartialSymbol<?,?> p) {
+		try {
+			Method m = p.getClass().getMethod("getName");
+			Object o = m.invoke(p);
+			if (o instanceof String string) return string;
+		} catch (Exception ignored) {}
+		try {
+			Method m = p.getClass().getMethod("name");
+			Object o = m.invoke(p);
+			if (o instanceof String string) return string;
+		} catch (Exception ignored) {}
+		String s = p.toString();
+		return (s == null || s.isBlank()) ? null : s;
 	}
 }
