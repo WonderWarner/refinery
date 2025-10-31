@@ -34,6 +34,9 @@ public class EvolveCommand implements Command {
 	private String inputPath;
 	private String outputPath = CliUtils.STANDARD_OUTPUT_PATH;
 	private final List<String> scopes = new ArrayList<>();
+	private long initialPopulationSize = 100;
+	private long randomizationDepth = 10;
+	private long numberOfGenerations = 100;
 	private long randomSeed = 1;
 	private double deltaSelectionRatio = 0.3;
 
@@ -54,12 +57,29 @@ public class EvolveCommand implements Command {
 		this.outputPath = outputPath;
 	}
 
-	@Parameter(names = {"-random-seed", "-r"}, description = "Random seed")
+	@Parameter(names = {"-random-seed", "-seed"}, description = "Random seed")
 	public void setRandomSeed(long randomSeed) {
 		this.randomSeed = randomSeed;
 	}
 
-	@Parameter(names = {"-delta-selection-percent", "-d"}, description = "Delta selection percent of Crossover " +
+	// TODO continue also use attributes
+	@Parameter(names = {"-initial-population-size", "-size"}, description = "Initial population size")
+	public void setInitialPopulationSize(long initialPopulationSize) {
+		this.initialPopulationSize = initialPopulationSize;
+	}
+
+	@Parameter(names = {"-randomization-depth", "-depth"}, description = "Randomization depth")
+	public void setRandomizationDepth(long randomizationDepth) {
+		this.randomizationDepth = randomizationDepth;
+	}
+
+
+	@Parameter(names = {"-generations", "-g"}, description = "Number of generations")
+	public void setNumberOfGenerations(long numberOfGenerations) {
+		this.numberOfGenerations = numberOfGenerations;
+	}
+
+	@Parameter(names = {"-delta-selection-percent", "-delta"}, description = "Delta selection percent of Crossover " +
 			"operation")
 	public void setDeltaSelectionRatio(long deltaSelectionPercent) {
 		double ratio = deltaSelectionPercent / 100.0;
@@ -75,6 +95,11 @@ public class EvolveCommand implements Command {
 			throw new IllegalArgumentException("Must provide output path");
 		}
 		var problem = loader.loadProblem(inputPath, scopes, new ArrayList<>());
+		try (var generator = generatorFactory.createGenerator(problem)) {
+			generator.generate();
+			System.exit(0);
+		}
+
 		var statements = problem.getStatements();
 
 		var crossoverRelations = new ArrayList<Relation>();

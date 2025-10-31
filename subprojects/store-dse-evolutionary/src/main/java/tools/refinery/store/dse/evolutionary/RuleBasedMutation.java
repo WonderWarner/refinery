@@ -4,6 +4,7 @@ import org.moeaframework.core.Solution;
 import org.moeaframework.core.operator.Mutation;
 import tools.refinery.store.dse.transition.Transformation;
 import tools.refinery.store.map.Version;
+import tools.refinery.store.model.Interpretation;
 import tools.refinery.visualization.statespace.VisualizationStore;
 
 import java.util.Random;
@@ -80,7 +81,10 @@ class RuleBasedMutation implements Mutation {
         if (!transformation.fireActivation(transformation.getActivation(activation))) {
             return null;
         }
-        var propagationAdapter = problem.getPropagationAdapter();
+
+		problem.displayVersion();
+
+		var propagationAdapter = problem.getPropagationAdapter();
         if (propagationAdapter != null) {
             var propagationResult = propagationAdapter.propagate();
             if (propagationResult.isRejected()) {

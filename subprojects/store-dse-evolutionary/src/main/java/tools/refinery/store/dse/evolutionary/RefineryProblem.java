@@ -13,6 +13,7 @@ import tools.refinery.store.dse.transition.DesignSpaceExplorationAdapter;
 import tools.refinery.store.dse.transition.ObjectiveValue;
 import tools.refinery.store.dse.transition.ObjectiveValues;
 import tools.refinery.store.map.Version;
+import tools.refinery.store.model.Interpretation;
 import tools.refinery.store.model.Model;
 import tools.refinery.store.model.ModelStore;
 import tools.refinery.store.reasoning.ReasoningAdapter;
@@ -83,10 +84,12 @@ public class RefineryProblem extends AbstractProblem {
         propagationAdapter = model.tryGetAdapter(PropagationAdapter.class).orElse(null);
 
 		var reasoningAdapter = model.getAdapter(ReasoningAdapter.class);
-		for(var objFun: objectiveFunctions) {
-			this.objectiveInterpretations.add(reasoningAdapter.getPartialInterpretation(Concreteness.CANDIDATE, objFun));
-		}
-		this.violationInterpretation = reasoningAdapter.getPartialInterpretation(Concreteness.PARTIAL, violationFunction);
+//		for(var objFun: objectiveFunctions) {
+//			this.objectiveInterpretations.add(reasoningAdapter.getPartialInterpretation(Concreteness.CANDIDATE, objFun));
+//		}
+//		this.violationInterpretation = reasoningAdapter.getPartialInterpretation(Concreteness.PARTIAL,
+//				violationFunction);
+		violationInterpretation = null;
 
 		var selectedSymbols = toSymbols(store, crossoverSymbols);
 
@@ -290,5 +293,34 @@ public class RefineryProblem extends AbstractProblem {
 		} catch (Exception ignored) {}
 		String s = p.toString();
 		return (s == null || s.isBlank()) ? null : s;
+	}
+
+	public void displaySymbolValue(String name) {
+		System.out.println("Displaying symbol: " + name);
+		var any = model.getInterpretation(model.getStore().getSymbolByName(name));
+		var inter = (Interpretation<?>) any;
+		var cur = inter.getAll();
+		while(cur.move()) {
+			var k = cur.getKey();
+			var v = cur.getValue();
+			System.out.println("\t" + k + " -> " + v);
+		}
+		System.out.println();
+	}
+
+	public void displayVersion() {
+		System.out.println("Displaying model version");
+		for(var symbol : model.getStore().getSymbols()) {
+			System.out.println("\tSymbol: "+ symbol.name());
+			var any = model.getInterpretation(symbol);
+			var inter = (Interpretation<?>) any;
+			var cur = inter.getAll();
+			while(cur.move()) {
+				var k = cur.getKey();
+				var v = cur.getValue();
+				System.out.println("\t\t" + k + " -> " + v);
+			}
+		}
+		System.out.println();
 	}
 }

@@ -6,6 +6,7 @@
 package tools.refinery.store.dse.propagation.impl;
 
 import tools.refinery.store.dse.propagation.*;
+import tools.refinery.store.model.Interpretation;
 import tools.refinery.store.model.Model;
 
 class PropagationAdapterImpl implements PropagationAdapter {
@@ -74,6 +75,7 @@ class PropagationAdapterImpl implements PropagationAdapter {
 				storeAdapter.isThrowOnFatalRejection()) {
 			rejectedResult.throwIfRejected();
 		}
+		displayVersion();
 		return result;
 	}
 
@@ -118,5 +120,21 @@ class PropagationAdapterImpl implements PropagationAdapter {
 	@Override
 	public PropagationStoreAdapter getStoreAdapter() {
 		return storeAdapter;
+	}
+
+	public void displayVersion() {
+		System.out.println("Displaying model version");
+		for(var symbol : model.getStore().getSymbols()) {
+			System.out.println("\tSymbol: "+ symbol.name());
+			var any = model.getInterpretation(symbol);
+			var inter = (Interpretation<?>) any;
+			var cur = inter.getAll();
+			while(cur.move()) {
+				var k = cur.getKey();
+				var v = cur.getValue();
+				System.out.println("\t\t" + k + " -> " + v);
+			}
+		}
+		System.out.println();
 	}
 }
