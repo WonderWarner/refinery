@@ -82,8 +82,6 @@ class RuleBasedMutation implements Mutation {
             return null;
         }
 
-		problem.displayVersion();
-
 		var propagationAdapter = problem.getPropagationAdapter();
         if (propagationAdapter != null) {
             var propagationResult = propagationAdapter.propagate();

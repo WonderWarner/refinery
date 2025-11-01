@@ -1,27 +1,29 @@
 import builtin::view.
 import builtin::annotations.
  
-#pred objective().
+#pred objective(boolean minimize).
 #pred crossover().
-#pred violationCount().
+#pred violation().
 
 @color(hex="#beaed4")
 abstract class SocialBeing {
- 	@crossover
-	SocialBeing[] friend
+    @crossover
+ 	SocialBeing[0..5] friend
 }
+@crossover
 @color(hex="#377eb8")
 class Person extends SocialBeing {
- 	@crossover
+    @crossover
     Dog[] pet opposite owner
 }
 @color(hex="#e5c494")
+@crossover
 class Dog extends SocialBeing {
- 	@crossover
+    @crossover
     Person owner opposite pet
 }
 
-% Noone should be their own friends
+% Noone can be their own friends
 propagation rule noSelf(a) ==> !friend(a,a).
 
 % A pet and it's owner should be true friends
@@ -29,71 +31,34 @@ pred trueFriends(SocialBeing sb1, SocialBeing sb2) <->
     friend(sb1, sb2),
     friend(sb2, sb1).
 
+@objective(true)
 pred ownerAndPetAreNotFriends(Person p, Dog d) <->
     pet(p, d),
     !trueFriends(p, d).
 
-@violationCount
-int violation1() =
-    count{ownerAndPetAreNotFriends(_, _)}.
+% A Person is good to have at least 2 true friends
+@objective(true)
+pred notEnoughFriendsForPerson(Person p) <->
+    !hasAtLeast2Friends(p, _, _).
 
-@objective
-int countViolationNumber() =
-     10 - count{node(_)}.
+pred hasAtLeast2Friends(Person p, SocialBeing a1, SocialBeing a2) <->
+    a1 != a2,
+    trueFriends(p, a1),
+    trueFriends(p, a2).
 
-% A Person is good to have 2..5 true friends
-@objective
-int objective1() =
-    howManyPeopleHaveTooManyFriends() + howManyPeopleHaveNotEnoughFriends().
+% Friend triangles should be minimized / maximized
+% @objective(true)
+@objective(false)
+pred beingInFriendTriangle(SocialBeing sb) <->
+    friendTriangle(sb, _, _).
 
-int numberOfFriends(SocialBeing sb) =
-    count { trueFriends(sb, _) }.
+pred friendTriangle(SocialBeing sb1, SocialBeing sb2, SocialBeing sb3) <->
+    trueFriends(sb1, sb2),
+    trueFriends(sb2, sb3),
+    trueFriends(sb3, sb1).
 
-pred tooManyFriends(Person p) <->
-    numberOfFriends(p) > 5.
+@objective(false)
+pred numberOfNodes(n) <->
+    node(n).
 
-int howManyPeopleHaveTooManyFriends() =
-    count { tooManyFriends(_) }.
-
-pred notEnoughFriends(Person p) <->
-    numberOfFriends(p) < 2.
-
-int howManyPeopleHaveNotEnoughFriends() =
-    count { notEnoughFriends(_) }.
-
-% % It is good to have cliques but not only in a triangle
-% pred friendTriangle(SocialBeing sb1, SocialBeing sb2, SocialBeing sb3) <->
-%     trueFriends(sb1, sb2),
-%     trueFriends(sb2, sb3),
-%     trueFriends(sb3, sb1).
-
-% pred friendOfAllThreeSocialBeing(SocialBeing sb1, SocialBeing sb2, SocialBeing sb3) <->
-%     trueFriends(sb, sb1),
-%     trueFriends(sb, sb2),
-%     trueFriends(sb, sb3).
-
-% pred beingInFriendTriangleWithoutBiggerClique(SocialBeing sb1) <->
-%     friendTriangle(sb1, _, _),
-%     !beingInAtLeastFourSizedClique(sb1).
-
-% @objective
-% int numberOfBeingsInFriendTriangles() =
-%     count { beingInFriendTriangleWithoutBiggerClique(_) }.
-
-% pred beingInAtLeastFourSizedClique(SocialBeing sb1) <->
-%     friendTriangle(sb1, sb2, sb3),
-%     friendOfAllThreeSocialBeing(sb1, sb2, sb3).
-
-
-% int numberOfBeingsInBiggerCliques() =
-%     count { beingInAtLeastFourSizedClique(_) }.
-
-% pred notInFriendGroup(SocialBeing sb) <->
-%     !beingInAtLeastFourSizedClique(_).
-
-% % TODO *..-2147483648 (?)
-% @objective
-% int objective2() =
-% 	count { notInFriendGroup(_)}.
-
-scope node = 10..15.
+scope node = 18..22.

@@ -30,46 +30,26 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class RefineryProblem extends AbstractProblem {
-    public static final int DEFAULT_RANDOMIZE_DEPTH = 1;
-    public static final boolean DEFAULT_VISUALIZATION_ENABLED = false;
-	public static final int ALLOWED_NUMBER_OF_VIOLATIONS = 5;
 
     private final Model model;
     private final Version initialVersion;
     private final VisualizationStore visualizationStore;
     private final int randomizeDepth;
+	private int maxViolations = 10;
     private final DesignSpaceExplorationAdapter dseAdapter;
     private final @Nullable PropagationAdapter propagationAdapter;
     private final RuleBasedMutation ruleBasedMutation;
     private final DeltaCrossover deltaCrossover ;
 
-	private final List<PartialInterpretation<?,?>> objectiveInterpretations = new ArrayList<>();
-	private final PartialInterpretation<?,?> violationInterpretation;
+	private final List<PartialInterpretation<?,?>> minObjectiveInterpretations = new ArrayList<>();
+	private final List<PartialInterpretation<?,?>> maxObjectiveInterpretations = new ArrayList<>();
+	private final List<PartialInterpretation<?,?>> violationInterpretations = new ArrayList<>();
 
     public RefineryProblem(ModelStore store, Version initialVersion, List<PartialSymbol<?,?>> crossoverSymbols,
-						   List<PartialFunction<?,?>> objectiveFunctions, PartialFunction<?,?> violationFunction ) {
-        this(store, initialVersion, crossoverSymbols, objectiveFunctions, violationFunction, DEFAULT_RANDOMIZE_DEPTH,
-				DEFAULT_VISUALIZATION_ENABLED);
-    }
-
-    public RefineryProblem(ModelStore store, Version initialVersion, List<PartialSymbol<?,?>> crossoverSymbols,
-						   List<PartialFunction<?,?>> objectiveFunctions, PartialFunction<?,?> violationFunction,
+						   List<PartialSymbol<?,?>> minObjectiveSymbols, List<PartialSymbol<?,?>> maxObjectiveSymbols,
+						   List<PartialSymbol<?,?>> violationSymbols, int randomizeDepth,
 						   boolean isVisualizationEnabled) {
-        this(store, initialVersion, crossoverSymbols, objectiveFunctions, violationFunction, DEFAULT_RANDOMIZE_DEPTH,
-				isVisualizationEnabled);
-    }
-
-    public RefineryProblem(ModelStore store, Version initialVersion, List<PartialSymbol<?,?>> crossoverSymbols,
-						   List<PartialFunction<?,?>> objectiveFunctions, PartialFunction<?,?> violationFunction,
-						   int randomizeDepth) {
-        this(store, initialVersion, crossoverSymbols, objectiveFunctions, violationFunction, randomizeDepth,
-				DEFAULT_VISUALIZATION_ENABLED);
-    }
-
-    public RefineryProblem(ModelStore store, Version initialVersion, List<PartialSymbol<?,?>> crossoverSymbols,
-						   List<PartialFunction<?,?>> objectiveFunctions, PartialFunction<?,?> violationFunction,
-						   int randomizeDepth, boolean isVisualizationEnabled) {
-        super(1, objectiveFunctions.size(), 1);
+        super(1, minObjectiveSymbols.size()+maxObjectiveSymbols.size(), 1);
         if (randomizeDepth < 0) {
             throw new IllegalArgumentException("randomizeDepth must be positive or zero");
         }
@@ -84,12 +64,15 @@ public class RefineryProblem extends AbstractProblem {
         propagationAdapter = model.tryGetAdapter(PropagationAdapter.class).orElse(null);
 
 		var reasoningAdapter = model.getAdapter(ReasoningAdapter.class);
-//		for(var objFun: objectiveFunctions) {
-//			this.objectiveInterpretations.add(reasoningAdapter.getPartialInterpretation(Concreteness.CANDIDATE, objFun));
-//		}
-//		this.violationInterpretation = reasoningAdapter.getPartialInterpretation(Concreteness.PARTIAL,
-//				violationFunction);
-		violationInterpretation = null;
+		for (var minObjectiveSymbol : minObjectiveSymbols) {
+			this.minObjectiveInterpretations.add(reasoningAdapter.getPartialInterpretation(Concreteness.CANDIDATE, minObjectiveSymbol));
+		}
+		for (var maxObjectiveSymbol : maxObjectiveSymbols) {
+			this.maxObjectiveInterpretations.add(reasoningAdapter.getPartialInterpretation(Concreteness.CANDIDATE, maxObjectiveSymbol));
+		}
+		for (var violationSymbol : violationSymbols) {
+			this.violationInterpretations.add(reasoningAdapter.getPartialInterpretation(Concreteness.CANDIDATE, violationSymbol));
+		}
 
 		var selectedSymbols = toSymbols(store, crossoverSymbols);
 
@@ -127,8 +110,8 @@ public class RefineryProblem extends AbstractProblem {
         }
         model.restore(version);
 
-		Integer constraintCount = getConstraintCount();
-		if (constraintCount == null || constraintCount > ALLOWED_NUMBER_OF_VIOLATIONS) {
+		int constraintCount = getConstraintCount();
+		if (constraintCount > maxViolations) {
 			setInfeasible(solution);
 			return;
 		}
@@ -136,7 +119,7 @@ public class RefineryProblem extends AbstractProblem {
         if (propagationAdapter != null && propagationAdapter.concretizationRequested()) {
             var concretizationResult = propagationAdapter.concretize();
 			constraintCount = getConstraintCount();
-            if (concretizationResult.isRejected() || constraintCount == null || constraintCount > ALLOWED_NUMBER_OF_VIOLATIONS) {
+            if (concretizationResult.isRejected() || constraintCount > maxViolations) {
                 setInfeasible(solution);
                 return;
             }
@@ -145,7 +128,7 @@ public class RefineryProblem extends AbstractProblem {
 		setObjectiveValues(solution);
 		solution.setConstraintValue(0, constraintCount);
 
-        if (visualizationStore != null && dseAdapter.checkAccept()) {
+        if (visualizationStore != null) {
             visualizationStore.addSolution(version);
         }
     }
@@ -157,43 +140,41 @@ public class RefineryProblem extends AbstractProblem {
         solution.setConstraintValue(0, Double.POSITIVE_INFINITY);
     }
 
-	private Integer getConstraintCount() {
-		var cursor = violationInterpretation.getAll();
-		if (cursor.move())
-		{
-			IntInterval interval = (IntInterval) cursor.getValue();
-			return getLowerValueOrNull(interval);
+	private int getConstraintCount() {
+		int totalViolations = 0;
+		for (var violationInterpretation : violationInterpretations) {
+			totalViolations += countPred(violationInterpretation);
 		}
-		return null;
+		return totalViolations;
 	}
 
 	private void setObjectiveValues(Solution solution) {
-		for (int i = 0; i < numberOfObjectives; i++) {
-			var objectiveInterpretation =  objectiveInterpretations.get(i);
-			var cursor = objectiveInterpretation.getAll();
-			if(cursor.move()) {
-				IntInterval interval = (IntInterval) cursor.getValue();
-				var value = getLowerValueOrNull(interval);
-				if (value == null) solution.setObjectiveValue(i, Double.POSITIVE_INFINITY);
-				else solution.setObjectiveValue(i, value);
-			}
-			else solution.setObjectiveValue(i, Double.POSITIVE_INFINITY);
+		int i = 0;
+		for (; i < minObjectiveInterpretations.size(); i++) {
+			int value = countPred(minObjectiveInterpretations.get(i));
+			solution.setObjectiveValue(i, value);
+		}
+		for (int j = 0; j < maxObjectiveInterpretations.size(); j++) {
+			int value = countPred(maxObjectiveInterpretations.get(j));
+			value *= -1;
+			solution.setObjectiveValue(i+j, value);
 		}
 	}
 
-	private Integer getLowerValueOrNull(IntInterval interval) {
-		IntBound number = interval.lowerBound();
-		if (number instanceof IntBound.Finite finite) {
-			return finite.value();
+	private int countPred(PartialInterpretation<?,?> partialInterpretation) {
+		var cursor = partialInterpretation.getAll();
+		int count = 0;
+		while(cursor.move()) {
+			count++;
 		}
-		return null;
+		return count;
 	}
 
     @Override
     public Solution newSolution() {
         var solution = new Solution(numberOfVariables, numberOfObjectives, numberOfConstraints);
         solution.setVariable(0, new VersionVariable(this, initialVersion));
-        solution.setConstraint(0, new LessThanOrEqual(ALLOWED_NUMBER_OF_VIOLATIONS));
+        solution.setConstraint(0, new LessThanOrEqual(maxViolations));
 
         if (visualizationStore != null) {
             visualizationStore.addState(getVersion(solution), dseAdapter.getObjectiveValue().toString());
@@ -238,18 +219,26 @@ public class RefineryProblem extends AbstractProblem {
 		deltaCrossover.setDeltaSelectionRatio(deltaSelectionRatio);
 	}
 
+	public void setShouldCrossoverTypes(boolean  shouldCrossoverTypes) {
+		deltaCrossover.setShouldCrossoverTypes(shouldCrossoverTypes);
+	}
+
+	public void setMaxViolations(int maxViolations) {
+		this.maxViolations = maxViolations;
+	}
+
+	public void setProbabilityOfCrossover(double probabilityOfCrossover) {
+		deltaCrossover.setProbabilityOfCrossover(probabilityOfCrossover);
+	}
+
 	public ObjectiveValue getObjectiveValue() {
 		double[] values = new double[numberOfObjectives];
-		for (int i = 0; i < numberOfObjectives; i++) {
-			var objectiveInterpretation =  objectiveInterpretations.get(i);
-			var cursor = objectiveInterpretation.getAll();
-			if(cursor.move()) {
-				IntInterval interval = (IntInterval) cursor.getValue();
-				var value = getLowerValueOrNull(interval);
-				if (value == null) values[i] = Double.POSITIVE_INFINITY;
-				else values[i] = value;
-			}
-			else values[i] = Double.POSITIVE_INFINITY;
+		int i = 0;
+		for (; i < minObjectiveInterpretations.size(); i++) {
+			values[i] = countPred(minObjectiveInterpretations.get(i));
+		}
+		for(int j = 0; j < maxObjectiveInterpretations.size(); j++) {
+			values[i+j] = -1 * countPred(maxObjectiveInterpretations.get(j));
 		}
 		return new ObjectiveValues.ObjectiveValueN(values);
 	}

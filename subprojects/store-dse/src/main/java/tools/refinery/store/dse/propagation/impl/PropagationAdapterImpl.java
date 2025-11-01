@@ -75,7 +75,6 @@ class PropagationAdapterImpl implements PropagationAdapter {
 				storeAdapter.isThrowOnFatalRejection()) {
 			rejectedResult.throwIfRejected();
 		}
-		displayVersion();
 		return result;
 	}
 
