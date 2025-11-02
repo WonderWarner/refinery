@@ -149,7 +149,7 @@ public class EvolveCommand implements Command {
 		generatorFactory.partialInterpretationBasedNeighborhoods(true);
 
 		var originalTime = time;
-		time = 10;
+		time = 1;
 		for(int i = 1; i<= 10; i++) {
 			runEvolutionaryAlgorithm(problem, crossoverRelations, minObjectiveRelations, maxObjectiveRelations,
 					violationRelations, i);
@@ -367,20 +367,28 @@ public class EvolveCommand implements Command {
 		Path outDir = Path.of(outputPath);
 		Files.createDirectories(outDir);
 
-		Path file = outDir.resolve("timings.csv");
+		Path file = outDir.resolve("variation_metrics.csv");
 		boolean append = runNumber != 2;
 
 		try (BufferedWriter writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8,
 				java.nio.file.StandardOpenOption.CREATE,
 				append ? java.nio.file.StandardOpenOption.APPEND : java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)) {
 			if (!append) {
-				writer.write("crossover_nanos,mutation_nanos,eval_measurement_nanos");
+				writer.write("crossover_nanos,mutation_nanos,eval_measurement_nanos,total_cross,success_cross," +
+						"total_mut,success_mut,total_eval,success_eval");
 				writer.newLine();
 			}
 			long crossoverNanos = DeltaCrossover.getCrossoverTimeNanos();
 			long mutationNanos = RuleBasedMutation.getMutationTimeNanos();
 			long measurementNanos = RefineryProblem.getMeasurementTimeNanos();
-			writer.write(crossoverNanos + "," + mutationNanos + "," + measurementNanos);
+			long totalCross = DeltaCrossover.getTotalCrossover();
+			long successCross = DeltaCrossover.getSuccessfulCrossover();
+			long totalMut = RuleBasedMutation.getTotalMutation();
+			long successMut = RuleBasedMutation.getSuccessfulMutation();
+			long totalEval = RefineryProblem.getTotalEvaluations();
+			long successEval = totalEval - RefineryProblem.getFailedEvaluations();
+			writer.write(crossoverNanos + "," + mutationNanos + "," + measurementNanos + "," +
+					totalCross + "," + successCross + "," + totalMut + "," + successMut + "," + totalEval + "," + successEval);
 			writer.newLine();
 		}
 	}
@@ -391,8 +399,8 @@ public class EvolveCommand implements Command {
 			moeaProblem.resetEvaluationRecords();
 		} catch (Exception ignored) {
 		}
-		RefineryProblem.setMeasurementTimeNanos(0L);
-		DeltaCrossover.setCrossoverTimeNanos(0L);
-		RuleBasedMutation.setMutationTimeNanos(0L);
+		RefineryProblem.resetMeasurements();
+		DeltaCrossover.resetMeasurements();
+		RuleBasedMutation.resetMeasurements();
 	}
 }

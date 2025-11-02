@@ -8,8 +8,6 @@ import org.moeaframework.core.operator.Variation;
 import org.moeaframework.problem.AbstractProblem;
 import tools.refinery.store.dse.propagation.PropagationAdapter;
 import tools.refinery.store.dse.transition.DesignSpaceExplorationAdapter;
-import tools.refinery.store.dse.transition.ObjectiveValue;
-import tools.refinery.store.dse.transition.ObjectiveValues;
 import tools.refinery.store.map.Version;
 import tools.refinery.store.model.Interpretation;
 import tools.refinery.store.model.Model;
@@ -32,11 +30,22 @@ public class RefineryProblem extends AbstractProblem {
 	public static synchronized void addMeasurementTimeNanos(long nanos) {
 		measurementTimeNanos += nanos;
 	}
-	public static synchronized void setMeasurementTimeNanos(long nanos) {
-		measurementTimeNanos = nanos;
-	}
 	public static synchronized long getMeasurementTimeNanos() {
 		return measurementTimeNanos;
+	}
+
+	private static long totalEvaluations = 0L;
+	private static long failedEvaluations = 0L;
+	public static long getTotalEvaluations() {
+		return totalEvaluations;
+	}
+	public static long getFailedEvaluations() {
+		return failedEvaluations;
+	}
+	public static void resetMeasurements() {
+		measurementTimeNanos = 0L;
+		totalEvaluations = 0L;
+		failedEvaluations = 0L;
 	}
 
 
@@ -187,6 +196,7 @@ public class RefineryProblem extends AbstractProblem {
 
     @Override
     public void evaluate(Solution solution) {
+		totalEvaluations++;
         var version = getVersion(solution);
         if (version == null) {
             setInfeasible(solution);
@@ -220,6 +230,7 @@ public class RefineryProblem extends AbstractProblem {
     }
 
     private void setInfeasible(Solution solution) {
+		failedEvaluations++;
 		for (int i = 0; i < numberOfObjectives; i++) {
 			solution.setObjectiveValue(i, Double.POSITIVE_INFINITY);
 		}

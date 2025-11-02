@@ -4,7 +4,6 @@ import org.moeaframework.core.Solution;
 import org.moeaframework.core.operator.Mutation;
 import tools.refinery.store.dse.transition.Transformation;
 import tools.refinery.store.map.Version;
-import tools.refinery.visualization.statespace.VisualizationStore;
 
 import java.util.Random;
 
@@ -14,11 +13,22 @@ public class RuleBasedMutation implements Mutation {
 	public static synchronized void addMutationTimeNanos(long nanos) {
 		mutationTimeNanos += nanos;
 	}
-	public static synchronized void setMutationTimeNanos(long nanos) {
-		mutationTimeNanos = nanos;
-	}
 	public static synchronized long getMutationTimeNanos() {
 		return mutationTimeNanos;
+	}
+
+	private static long totalMutation = 0L;
+	private static long successfulMutation = 0L;
+	public static long getTotalMutation() {
+		return totalMutation;
+	}
+	public static long getSuccessfulMutation() {
+		return successfulMutation;
+	}
+	public static synchronized void resetMeasurements() {
+		mutationTimeNanos = 0L;
+		totalMutation = 0L;
+		successfulMutation = 0L;
 	}
 
 	private final RefineryProblem problem;
@@ -83,9 +93,13 @@ public class RuleBasedMutation implements Mutation {
 //			}
 
 			RefineryProblem.setVersion(child, childVersion);
+			if(childVersion != null) {
+				successfulMutation++;
+			}
 			return child;
 		} finally {
 			addMutationTimeNanos(System.nanoTime() - start);
+			totalMutation++;
 		}
     }
 

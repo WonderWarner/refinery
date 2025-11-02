@@ -86,11 +86,13 @@ pred inClassFunctionalDependency(m1,m2) <->
 @objective(false)
 pred numberOfNodes(n) <->
     node(n).
-
+	
+@objective(true)
 @violation
 pred featureHasNoClass(Feature f) <->
     !encapsulates(_,f).
 
+@objective(true)
 @violation
 pred featureInMultipleClasses(Feature f, Class c1, Class c2) <->
     c1 != c2,

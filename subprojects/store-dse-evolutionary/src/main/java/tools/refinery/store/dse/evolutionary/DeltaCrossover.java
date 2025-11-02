@@ -21,11 +21,22 @@ public class DeltaCrossover implements Variation {
 	public static synchronized void addCrossoverTimeNanos(long nanos) {
 		crossoverTimeNanos += nanos;
 	}
-	public static synchronized void setCrossoverTimeNanos(long nanos) {
-		crossoverTimeNanos = nanos;
-	}
 	public static synchronized long getCrossoverTimeNanos() {
 		return crossoverTimeNanos;
+	}
+
+	private static long totalCrossover = 0L;
+	private static long successfulCrossover = 0L;
+	public static long getTotalCrossover() {
+		return totalCrossover;
+	}
+	public static long getSuccessfulCrossover() {
+		return successfulCrossover;
+	}
+	public static synchronized void resetMeasurements() {
+		crossoverTimeNanos = 0L;
+		totalCrossover = 0L;
+		successfulCrossover = 0L;
 	}
 
 	private static final String TYPE_SYMBOL_NAME = "TYPE";
@@ -101,6 +112,7 @@ public class DeltaCrossover implements Variation {
 				return new Solution[]{solutions[0].copy(), solutions[1].copy()};
 			}
 
+			totalCrossover++;
 			var child = solutions[0].copy();
 			var version1 = RefineryProblem.getVersion(solutions[0]);
 			var version2 = RefineryProblem.getVersion(solutions[1]);
@@ -143,6 +155,7 @@ public class DeltaCrossover implements Variation {
 			}
 
 			RefineryProblem.setVersion(child, childVersion);
+			successfulCrossover++;
 
 //			if (isVisualizationEnabled) {
 //				visualizationStore.addState(childVersion, problem.getObjectiveValue().toString());

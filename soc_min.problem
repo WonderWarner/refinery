@@ -59,5 +59,20 @@ pred friendTriangle(SocialBeing sb1, SocialBeing sb2, SocialBeing sb3) <->
 @objective(false)
 pred numberOfNodes(n) <->
     node(n).
+	
+@objective(true)
+@violation()
+pred violations(sb) <->
+	dogWithoutOwner(sb)
+;
+	personWithMoreThan2Dogs(sb).
+
+pred dogWithoutOwner(Dog d) <->
+    !pet(_, d).
+
+pred personWithMoreThan2Dogs(Person p) <->
+    Dog(d1),Dog(d2),Dog(d3),
+    d1 != d2, d1 != d3, d2 != d3,
+    pet(p, d1), pet(p,d2), pet(p,d3).
 
 scope node = 18..22.
