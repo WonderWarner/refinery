@@ -19,29 +19,43 @@ abstract class Feature {
 
 @color(hex="#377eb8")
 class Method extends Feature {
-  Method[] functionalDependency
-  Attribute[] dataDependency
+  Method[0..4] functionalDependency
+  Attribute[0..3] dataDependency
 }
 
 @color(hex="#e5c494")
 class Attribute extends Feature.
-scope node = 2..20, Feature = 4..20, Class = 3..10.
 
-% Write constraints and objectives
+% For generating initial version without classes
+% 5th generation is selected and method8 and attribute9 added with their dependencies.
+% scope node = 15.
+% pred connected(Feature f) <->
+%     functionalDependency(f, _);
+%     functionalDependency(_, f);
+%     dataDependency(f,_);
+%     dataDependency(_,f).
+% error pred notConnected(Feature f) <->
+%     !connected(f).
 
 %minimize
 @objective(true)
+pred interClassDependency(f1,f2) <->
+    interClassAttributeDependency(f1, f2)
+;
+    interClassFunctionalDependency(f1, f2).
+
 pred interClassAttributeDependency(a,m) <->
     encapsulates(c1,a),
     encapsulates(c2,m),
     dataDependency(a,m),
     c1 != c2.
-@objective(true)
+
 pred interClassFunctionalDependency(m1,m2) <->
     encapsulates(c1,m1),
     encapsulates(c2,m2),
     functionalDependency(m1,m2),
     c1 != c2.
+
 @objective(true)
 pred inClassNoDependency(Feature f1, Feature f2) <->
     f1 != f2,
@@ -52,17 +66,23 @@ pred inClassNoDependency(Feature f1, Feature f2) <->
     !dataDependency(f1, f2),
     !dataDependency(f2, f1).
 
-%maximize
+% %maximize
 @objective(false)
-pred inClassAttrubiteDependency(a,m) <->
+pred inClassDependency(f1, f2) <->
+    inClassAttributeDependency(f1, f2)
+;
+    inClassFunctionalDependency(f1, f2).
+
+pred inClassAttributeDependency(a,m) <->
     encapsulates(c,a),
     encapsulates(c,m),
     dataDependency(a,m).
-@objective(false)
+
 pred inClassFunctionalDependency(m1,m2) <->
     encapsulates(c,m1),
     encapsulates(c,m2),
     functionalDependency(m1,m2).
+
 @objective(false)
 pred numberOfNodes(n) <->
     node(n).
@@ -79,104 +99,74 @@ pred featureInMultipleClasses(Feature f, Class c1, Class c2) <->
 
 scope node = 18..22.
 
+declare method1, attribute1, attribute2, method2, attribute3, attribute4,
+	attribute5, method3, method4, method5, attribute6, attribute7, method6,
+	attribute8, method7, method8, attribute9.
 !exists(Method::new).
 !exists(Attribute::new).
+Method(method1).
 Attribute(attribute1).
 Attribute(attribute2).
-Attribute(attribute3).
-Method(method1).
 Method(method2).
-Method(method3).
+Attribute(attribute3).
 Attribute(attribute4).
+Attribute(attribute5).
+Method(method3).
 Method(method4).
 Method(method5).
+Attribute(attribute6).
+Attribute(attribute7).
 Method(method6).
+Attribute(attribute8).
 Method(method7).
 Method(method8).
-Method(method9).
-Method(method10).
+Attribute(attribute9).
 default !functionalDependency(*, *).
-functionalDependency(method1, method1).
-functionalDependency(method1, method2).
-functionalDependency(method1, method3).
-functionalDependency(method1, method4).
-functionalDependency(method1, method5).
-functionalDependency(method1, method6).
-functionalDependency(method1, method7).
-functionalDependency(method1, method8).
-functionalDependency(method1, method9).
-functionalDependency(method2, method1).
 functionalDependency(method2, method2).
 functionalDependency(method2, method3).
 functionalDependency(method2, method4).
 functionalDependency(method2, method5).
-functionalDependency(method2, method7).
-functionalDependency(method2, method8).
-functionalDependency(method3, method1).
 functionalDependency(method3, method2).
 functionalDependency(method3, method3).
 functionalDependency(method3, method4).
-functionalDependency(method3, method6).
-functionalDependency(method3, method7).
-functionalDependency(method3, method8).
-functionalDependency(method4, method1).
+functionalDependency(method3, method5).
+functionalDependency(method4, method2).
 functionalDependency(method4, method3).
 functionalDependency(method4, method4).
 functionalDependency(method4, method5).
-functionalDependency(method4, method6).
-functionalDependency(method4, method8).
-functionalDependency(method4, method9).
-functionalDependency(method5, method1).
 functionalDependency(method5, method2).
 functionalDependency(method5, method3).
+functionalDependency(method5, method4).
 functionalDependency(method5, method5).
-functionalDependency(method5, method6).
-functionalDependency(method5, method7).
-functionalDependency(method5, method8).
-functionalDependency(method6, method1).
 functionalDependency(method6, method2).
 functionalDependency(method6, method3).
 functionalDependency(method6, method4).
 functionalDependency(method6, method6).
-functionalDependency(method6, method7).
+functionalDependency(method7, method2).
+functionalDependency(method7, method3).
 functionalDependency(method7, method5).
-functionalDependency(method7, method7).
-functionalDependency(method7, method8).
-functionalDependency(method8, method1).
-functionalDependency(method8, method2).
-functionalDependency(method8, method6).
-functionalDependency(method8, method7).
-functionalDependency(method8, method8).
-functionalDependency(method8, method9).
-functionalDependency(method9, method1).
-functionalDependency(method9, method3).
-functionalDependency(method9, method5).
-functionalDependency(method9, method8).
+functionalDependency(method7, method6).
 default !dataDependency(*, *).
-dataDependency(method1, attribute1).
-dataDependency(method1, attribute2).
-dataDependency(method1, attribute4).
+dataDependency(method1, attribute3).
+dataDependency(method1, attribute6).
+dataDependency(method1, attribute7).
 dataDependency(method2, attribute1).
-dataDependency(method2, attribute2).
 dataDependency(method2, attribute3).
-dataDependency(method2, attribute4).
+dataDependency(method2, attribute5).
 dataDependency(method3, attribute1).
 dataDependency(method3, attribute2).
-dataDependency(method3, attribute3).
-dataDependency(method3, attribute4).
+dataDependency(method3, attribute5).
 dataDependency(method4, attribute1).
-dataDependency(method4, attribute2).
 dataDependency(method4, attribute3).
+dataDependency(method4, attribute4).
 dataDependency(method5, attribute1).
-dataDependency(method5, attribute2).
 dataDependency(method5, attribute3).
-dataDependency(method5, attribute4).
-dataDependency(method6, attribute2).
-dataDependency(method6, attribute3).
+dataDependency(method5, attribute5).
+dataDependency(method6, attribute1).
 dataDependency(method6, attribute4).
-dataDependency(method7, attribute1).
-dataDependency(method7, attribute2).
+dataDependency(method6, attribute8).
+dataDependency(method7, attribute3).
 dataDependency(method7, attribute4).
-dataDependency(method8, attribute1).
-dataDependency(method9, attribute2).
-
+dataDependency(method7, attribute5).
+dataDependency(method8, attribute9).
+dataDependency(method8, attribute8).

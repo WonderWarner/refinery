@@ -6,8 +6,6 @@ import org.moeaframework.core.constraint.LessThanOrEqual;
 import org.moeaframework.core.operator.Mutation;
 import org.moeaframework.core.operator.Variation;
 import org.moeaframework.problem.AbstractProblem;
-import tools.refinery.logic.term.intinterval.IntBound;
-import tools.refinery.logic.term.intinterval.IntInterval;
 import tools.refinery.store.dse.propagation.PropagationAdapter;
 import tools.refinery.store.dse.transition.DesignSpaceExplorationAdapter;
 import tools.refinery.store.dse.transition.ObjectiveValue;
@@ -19,7 +17,6 @@ import tools.refinery.store.model.ModelStore;
 import tools.refinery.store.reasoning.ReasoningAdapter;
 import tools.refinery.store.reasoning.interpretation.PartialInterpretation;
 import tools.refinery.store.reasoning.literal.Concreteness;
-import tools.refinery.store.reasoning.representation.PartialFunction;
 import tools.refinery.store.reasoning.representation.PartialSymbol;
 import tools.refinery.store.representation.Symbol;
 import tools.refinery.visualization.statespace.VisualizationStore;
@@ -27,11 +24,98 @@ import tools.refinery.visualization.statespace.internal.VisualizationStoreImpl;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class RefineryProblem extends AbstractProblem {
+	private static long measurementTimeNanos = 0L;
+	public static synchronized void addMeasurementTimeNanos(long nanos) {
+		measurementTimeNanos += nanos;
+	}
+	public static synchronized void setMeasurementTimeNanos(long nanos) {
+		measurementTimeNanos = nanos;
+	}
+	public static synchronized long getMeasurementTimeNanos() {
+		return measurementTimeNanos;
+	}
 
-    private final Model model;
+
+	public record EvaluationRecord(long elapsedSinceFirstEvalNanos, double[] objectives, double constraintValue) {
+		public EvaluationRecord {
+			objectives = objectives == null ? new double[0] : Arrays.copyOf(objectives, objectives.length);
+		}
+	}
+	private static long firstEvaluationTimeNanos = -1L;
+	private final List<EvaluationRecord> evaluationRecords = new ArrayList<>();
+	private double[] bestObjectiveValues;
+	private double bestConstraintValue = Double.POSITIVE_INFINITY;
+
+	private synchronized void collectEvaluation(Solution solution) {
+		long startTime = System.nanoTime();
+		try {
+
+		if (solution == null) return;
+
+		long now = System.nanoTime();
+		if (firstEvaluationTimeNanos < 0) {
+			firstEvaluationTimeNanos = now;
+		}
+		long elapsed = now - firstEvaluationTimeNanos;
+
+		double[] objectives = new double[numberOfObjectives];
+		for (int i = 0; i < numberOfObjectives; i++) {
+			objectives[i] = solution.getObjective(i).getValue();
+		}
+		double constraintVal = solution.getConstraint(0).getValue();
+
+		if (bestObjectiveValues == null || bestObjectiveValues.length != numberOfObjectives) {
+			bestObjectiveValues = new double[numberOfObjectives];
+			for (int i = 0; i < numberOfObjectives; i++) bestObjectiveValues[i] = Double.POSITIVE_INFINITY;
+			bestConstraintValue = Double.POSITIVE_INFINITY;
+		}
+
+		boolean improved = false;
+		for (int i = 0; i < numberOfObjectives; i++) {
+			if (objectives[i] < bestObjectiveValues[i]) {
+				improved = true;
+				break;
+			}
+		}
+		if (!improved && constraintVal < bestConstraintValue) {
+			improved = true;
+		}
+
+		if (improved) {
+			for (int i = 0; i < numberOfObjectives; i++) {
+				if (objectives[i] < bestObjectiveValues[i]) {
+					bestObjectiveValues[i] = objectives[i];
+				}
+			}
+			if (constraintVal < bestConstraintValue) {
+				bestConstraintValue = constraintVal;
+			}
+
+			evaluationRecords.add(new EvaluationRecord(elapsed, objectives, constraintVal));
+		}
+		} finally {
+			addMeasurementTimeNanos(System.nanoTime() - startTime);
+		}
+	}
+
+	public synchronized EvaluationRecord[] getEvaluationRecords() {
+		return evaluationRecords.toArray(new EvaluationRecord[0]);
+	}
+
+	public synchronized void resetEvaluationRecords() {
+		evaluationRecords.clear();
+		firstEvaluationTimeNanos = -1L;
+		bestConstraintValue = Double.POSITIVE_INFINITY;
+		if (bestObjectiveValues != null) {
+			Arrays.fill(bestObjectiveValues, Double.POSITIVE_INFINITY);
+		}
+	}
+
+	private final Model model;
     private final Version initialVersion;
     private final VisualizationStore visualizationStore;
     private final int randomizeDepth;
@@ -128,9 +212,11 @@ public class RefineryProblem extends AbstractProblem {
 		setObjectiveValues(solution);
 		solution.setConstraintValue(0, constraintCount);
 
-        if (visualizationStore != null) {
-            visualizationStore.addSolution(version);
-        }
+		collectEvaluation(solution);
+
+//        if (visualizationStore != null) {
+//            visualizationStore.addSolution(version);
+//        }
     }
 
     private void setInfeasible(Solution solution) {
@@ -176,9 +262,9 @@ public class RefineryProblem extends AbstractProblem {
         solution.setVariable(0, new VersionVariable(this, initialVersion));
         solution.setConstraint(0, new LessThanOrEqual(maxViolations));
 
-        if (visualizationStore != null) {
-            visualizationStore.addState(getVersion(solution), dseAdapter.getObjectiveValue().toString());
-        }
+//        if (visualizationStore != null) {
+//            visualizationStore.addState(getVersion(solution), dseAdapter.getObjectiveValue().toString());
+//        }
 
         return solution;
     }
@@ -219,8 +305,8 @@ public class RefineryProblem extends AbstractProblem {
 		deltaCrossover.setDeltaSelectionRatio(deltaSelectionRatio);
 	}
 
-	public void setShouldCrossoverTypes(boolean  shouldCrossoverTypes) {
-		deltaCrossover.setShouldCrossoverTypes(shouldCrossoverTypes);
+	public void setShouldCrossoverNodes(boolean  shouldCrossoverNodes) {
+		deltaCrossover.setShouldCrossoverNodes(shouldCrossoverNodes);
 	}
 
 	public void setMaxViolations(int maxViolations) {
@@ -229,18 +315,6 @@ public class RefineryProblem extends AbstractProblem {
 
 	public void setProbabilityOfCrossover(double probabilityOfCrossover) {
 		deltaCrossover.setProbabilityOfCrossover(probabilityOfCrossover);
-	}
-
-	public ObjectiveValue getObjectiveValue() {
-		double[] values = new double[numberOfObjectives];
-		int i = 0;
-		for (; i < minObjectiveInterpretations.size(); i++) {
-			values[i] = countPred(minObjectiveInterpretations.get(i));
-		}
-		for(int j = 0; j < maxObjectiveInterpretations.size(); j++) {
-			values[i+j] = -1 * countPred(maxObjectiveInterpretations.get(j));
-		}
-		return new ObjectiveValues.ObjectiveValueN(values);
 	}
 
 	public static List<Symbol<?>> toSymbols(ModelStore store, List<PartialSymbol<?,?>> partialSymbols) {
@@ -284,20 +358,8 @@ public class RefineryProblem extends AbstractProblem {
 		return (s == null || s.isBlank()) ? null : s;
 	}
 
-	public void displaySymbolValue(String name) {
-		System.out.println("Displaying symbol: " + name);
-		var any = model.getInterpretation(model.getStore().getSymbolByName(name));
-		var inter = (Interpretation<?>) any;
-		var cur = inter.getAll();
-		while(cur.move()) {
-			var k = cur.getKey();
-			var v = cur.getValue();
-			System.out.println("\t" + k + " -> " + v);
-		}
-		System.out.println();
-	}
-
-	public void displayVersion() {
+	public void displayVersion(Version version) {
+		model.restore(version);
 		System.out.println("Displaying model version");
 		for(var symbol : model.getStore().getSymbols()) {
 			System.out.println("\tSymbol: "+ symbol.name());

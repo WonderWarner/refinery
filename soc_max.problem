@@ -47,7 +47,6 @@ pred hasAtLeast2Friends(Person p, SocialBeing a1, SocialBeing a2) <->
     trueFriends(p, a2).
 
 % Friend triangles should be minimized / maximized
-% @objective(true)
 @objective(false)
 pred beingInFriendTriangle(SocialBeing sb) <->
     friendTriangle(sb, _, _).

@@ -17,6 +17,17 @@ import java.util.*;
 
 public class DeltaCrossover implements Variation {
 
+	private static long crossoverTimeNanos = 0L;
+	public static synchronized void addCrossoverTimeNanos(long nanos) {
+		crossoverTimeNanos += nanos;
+	}
+	public static synchronized void setCrossoverTimeNanos(long nanos) {
+		crossoverTimeNanos = nanos;
+	}
+	public static synchronized long getCrossoverTimeNanos() {
+		return crossoverTimeNanos;
+	}
+
 	private static final String TYPE_SYMBOL_NAME = "TYPE";
 	private static final String COUNT_SYMBOL_NAME = "COUNT";
 	private static final Random random = new Random();
@@ -24,9 +35,9 @@ public class DeltaCrossover implements Variation {
 	private final RefineryProblem problem;
 	private final Model model;
 	private final ModelStore modelStore;
-	private final VisualizationStore visualizationStore;
-	private final boolean isVisualizationEnabled;
-	private boolean shouldCrossoverTypes = false;
+	//private final VisualizationStore visualizationStore;
+	//private final boolean isVisualizationEnabled;
+	private boolean shouldCrossoverNodes = false;
 	private ModelDiffCursor diffCursor;
 	private double deltaSelectionRatio;
 	private double probabilityOfCrossover = 0.3;
@@ -42,8 +53,8 @@ public class DeltaCrossover implements Variation {
 		this.crossoverSymbols = crossoverSymbols;
 		this.model = problem.getModel();
 		this.modelStore = model.getStore();
-		visualizationStore = problem.getVisualizationStore();
-		isVisualizationEnabled = visualizationStore != null;
+		//visualizationStore = problem.getVisualizationStore();
+		//isVisualizationEnabled = visualizationStore != null;
 		this.diffCursor = null; // Will be set in evolve method
 	}
 
@@ -51,8 +62,8 @@ public class DeltaCrossover implements Variation {
 		random.setSeed(seed);
 	}
 
-	public void setShouldCrossoverTypes(boolean shouldCrossoverTypes) {
-		this.shouldCrossoverTypes = shouldCrossoverTypes;
+	public void setShouldCrossoverNodes(boolean shouldCrossoverNodes) {
+		this.shouldCrossoverNodes = shouldCrossoverNodes;
 	}
 
 	public void setProbabilityOfCrossover(double probability) {
@@ -81,63 +92,69 @@ public class DeltaCrossover implements Variation {
 
 	@Override
 	public Solution[] evolve(Solution[] solutions) {
-		if (solutions.length != this.getArity()) {
-			throw new IllegalArgumentException("This Crossover requires " + this.getArity() + " solutions");
-		}
-		if (random.nextDouble() > probabilityOfCrossover) {
-			return new Solution[] { solutions[0].copy(), solutions[1].copy() };
-		}
-
-		var child = solutions[0].copy();
-		var version1 = RefineryProblem.getVersion(solutions[0]);
-		var version2 = RefineryProblem.getVersion(solutions[1]);
-		if (version1 == null || version2 == null) {
-			return new Solution[] { solutions[0].copy(), solutions[1].copy() };
-		}
-
-		var abstractIdsOfVersion1 = new HashSet<Integer>();
-		var abstractIdsOfVersion2 = new HashSet<Integer>();
-		var sizeOfVersion1 = getSizeOfVersionAndCollectAbstractIds(version1, abstractIdsOfVersion1);
-		var sizeOfVersion2 = getSizeOfVersionAndCollectAbstractIds(version2, abstractIdsOfVersion2);
-
-		// Count nodes for both versions and pick the one with fewer nodes as the base
-		if (sizeOfVersion1 > sizeOfVersion2) {
-			var tempVersion = version1;
-			version1 = version2;
-			version2 = tempVersion;
-
-			var tempIds = abstractIdsOfVersion1;
-			abstractIdsOfVersion1 = abstractIdsOfVersion2;
-			abstractIdsOfVersion2 = tempIds;
-		}
-
-		// preserveIds will be kept from version1 and should be ignored when applying diffs
-		var preserveIds = new HashSet<Integer>();
-		// abstractIdsOfVersion2 that are not in version1 will be changed to the abstract version
-		// it's edges also should be set to UNKNOWN
-		for (Integer id : abstractIdsOfVersion1) {
-			if (!abstractIdsOfVersion2.remove(id)) {
-				preserveIds.add(id);
+		long start = System.nanoTime();
+		try {
+			if (solutions.length != this.getArity()) {
+				throw new IllegalArgumentException("This Crossover requires " + this.getArity() + " solutions");
 			}
+			if (random.nextDouble() > probabilityOfCrossover) {
+				return new Solution[]{solutions[0].copy(), solutions[1].copy()};
+			}
+
+			var child = solutions[0].copy();
+			var version1 = RefineryProblem.getVersion(solutions[0]);
+			var version2 = RefineryProblem.getVersion(solutions[1]);
+			if (version1 == null || version2 == null) {
+				return new Solution[]{solutions[0].copy(), solutions[1].copy()};
+			}
+
+			var abstractIdsOfVersion1 = new HashSet<Integer>();
+			var abstractIdsOfVersion2 = new HashSet<Integer>();
+			var sizeOfVersion1 = getSizeOfVersionAndCollectAbstractIds(version1, abstractIdsOfVersion1);
+			var sizeOfVersion2 = getSizeOfVersionAndCollectAbstractIds(version2, abstractIdsOfVersion2);
+
+			// Count nodes for both versions and pick the one with fewer nodes as the base
+			if (sizeOfVersion1 > sizeOfVersion2) {
+				var tempVersion = version1;
+				version1 = version2;
+				version2 = tempVersion;
+
+				var tempIds = abstractIdsOfVersion1;
+				abstractIdsOfVersion1 = abstractIdsOfVersion2;
+				abstractIdsOfVersion2 = tempIds;
+			}
+
+			// preserveIds will be kept from version1 and should be ignored when applying diffs
+			var preserveIds = new HashSet<Integer>();
+			// abstractIdsOfVersion2 that are not in version1 will be changed to the abstract version
+			// it's edges also should be set to UNKNOWN
+			for (Integer id : abstractIdsOfVersion1) {
+				if (!abstractIdsOfVersion2.remove(id)) {
+					preserveIds.add(id);
+				}
+			}
+
+			model.restore(version1);
+			this.diffCursor = model.getDiffCursor(version2);
+
+			var childVersion = applyDeltasAndCommit(preserveIds, abstractIdsOfVersion2);
+			if (childVersion == null) {
+				return new Solution[]{solutions[0].copy(), solutions[1].copy()};
+			}
+
+			RefineryProblem.setVersion(child, childVersion);
+
+//			if (isVisualizationEnabled) {
+//				visualizationStore.addState(childVersion, problem.getObjectiveValue().toString());
+//				visualizationStore.addTransition(version1, childVersion, Double.toString(1 - deltaSelectionRatio));
+//				visualizationStore.addTransition(version2, childVersion, Double.toString(deltaSelectionRatio));
+//			}
+
+			return new Solution[]{child};
 		}
-
-		model.restore(version1);
-		this.diffCursor = model.getDiffCursor(version2);
-
-		var childVersion = applyDeltasAndCommit(preserveIds, abstractIdsOfVersion2);
-		if (childVersion == null) {
-			return new Solution[] { solutions[0].copy(), solutions[1].copy() };
+		finally {
+			addCrossoverTimeNanos(System.nanoTime() - start);
 		}
-
-		RefineryProblem.setVersion(child, childVersion);
-
-		if (isVisualizationEnabled) {
-			visualizationStore.addState(childVersion, problem.getObjectiveValue().toString());
-			visualizationStore.addTransition(version1, childVersion, Double.toString(1- deltaSelectionRatio));
-			visualizationStore.addTransition(version2, childVersion, Double.toString(deltaSelectionRatio));
-		}
-
-		return new Solution[] { child };
 	}
 
 	private long getSizeOfVersionAndCollectAbstractIds(Version version, Set<Integer> abstractIds) {
@@ -162,7 +179,7 @@ public class DeltaCrossover implements Variation {
 	private Version applyDeltasAndCommit(Set<Integer> toPreserveIds, Set<Integer> toAbstractIds) {
 
 		// Handling nodes
-		var nodeChanges = mergeNodesAndReturnDeletedIds(toPreserveIds, toAbstractIds);
+		var nodeChanges = mergeNodes(toPreserveIds, toAbstractIds);
 
 		// Handling edges and attributes
 		for (var symbol : crossoverSymbols) {
@@ -197,7 +214,7 @@ public class DeltaCrossover implements Variation {
 		return model.commit();
 	}
 
-	private NodeChanges mergeNodesAndReturnDeletedIds(Set<Integer> toPreserveIds, Set<Integer> toAbstractIds) {
+	private NodeChanges mergeNodes(Set<Integer> toPreserveIds, Set<Integer> toAbstractIds) {
 		var nodeChanges = updateTypes(toPreserveIds, toAbstractIds);
 		updateCounts(nodeChanges, toAbstractIds);
 		return nodeChanges;
@@ -224,7 +241,7 @@ public class DeltaCrossover implements Variation {
 			else if(toAbstractIds.contains(id)) {
 				typeInterpretation.put(td.getKey(), td.getNewValue()); // works if we get diffs in the right order
 			}
-			else if (shouldCrossoverTypes && random.nextDouble() < deltaSelectionRatio) {
+			else if (shouldCrossoverNodes && random.nextDouble() < deltaSelectionRatio) {
 				typeInterpretation.put(td.getKey(), td.getNewValue());
 				if (checkIfTypeValueIsNull(td.getOldValue())) {
 					createdNodes.add(id);
@@ -264,7 +281,7 @@ public class DeltaCrossover implements Variation {
 		}
 
 		// 2) Collect last newValue for created nodes and nodes to be abstracted (per key) by scanning COUNT diffs and overwriting entries.
-		var nodesToUpdateCount = new HashSet<Integer>(nodeChanges.createdNodes);
+		var nodesToUpdateCount = new HashSet<>(nodeChanges.createdNodes);
 		nodesToUpdateCount.addAll(toAbstractIds);
 		Map<Tuple, Object> newCountValues = collectNewCountForNodes((Symbol<?>) countSymbol, nodesToUpdateCount);
 
