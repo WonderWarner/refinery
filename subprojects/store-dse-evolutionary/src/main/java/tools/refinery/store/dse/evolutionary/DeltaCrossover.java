@@ -17,6 +17,12 @@ import java.util.*;
 
 public class DeltaCrossover implements Variation {
 
+	private boolean successfullSaved = false;
+
+	public static List<Integer> deltaPerSuccessful = new ArrayList<>();
+	public static List<Integer> deltaPerFail = new ArrayList<>();
+	private static int appliedDeltaCount = 0;
+
 	private static long crossoverTimeNanos = 0L;
 	public static synchronized void addCrossoverTimeNanos(long nanos) {
 		crossoverTimeNanos += nanos;
@@ -37,6 +43,8 @@ public class DeltaCrossover implements Variation {
 		crossoverTimeNanos = 0L;
 		totalCrossover = 0L;
 		successfulCrossover = 0L;
+		deltaPerSuccessful.clear();
+		deltaPerFail.clear();
 	}
 
 	private static final String TYPE_SYMBOL_NAME = "TYPE";
@@ -46,8 +54,8 @@ public class DeltaCrossover implements Variation {
 	private final RefineryProblem problem;
 	private final Model model;
 	private final ModelStore modelStore;
-	//private final VisualizationStore visualizationStore;
-	//private final boolean isVisualizationEnabled;
+	private final VisualizationStore visualizationStore;
+	private final boolean isVisualizationEnabled;
 	private boolean shouldCrossoverNodes = false;
 	private ModelDiffCursor diffCursor;
 	private double deltaSelectionRatio;
@@ -64,8 +72,8 @@ public class DeltaCrossover implements Variation {
 		this.crossoverSymbols = crossoverSymbols;
 		this.model = problem.getModel();
 		this.modelStore = model.getStore();
-		//visualizationStore = problem.getVisualizationStore();
-		//isVisualizationEnabled = visualizationStore != null;
+		visualizationStore = problem.getVisualizationStore();
+		isVisualizationEnabled = visualizationStore != null;
 		this.diffCursor = null; // Will be set in evolve method
 	}
 
@@ -113,6 +121,7 @@ public class DeltaCrossover implements Variation {
 			}
 
 			totalCrossover++;
+			appliedDeltaCount = 0;
 			var child = solutions[0].copy();
 			var version1 = RefineryProblem.getVersion(solutions[0]);
 			var version2 = RefineryProblem.getVersion(solutions[1]);
@@ -151,17 +160,24 @@ public class DeltaCrossover implements Variation {
 
 			var childVersion = applyDeltasAndCommit(preserveIds, abstractIdsOfVersion2);
 			if (childVersion == null) {
+				deltaPerFail.add(appliedDeltaCount);
 				return new Solution[]{solutions[0].copy(), solutions[1].copy()};
 			}
 
 			RefineryProblem.setVersion(child, childVersion);
 			successfulCrossover++;
+			deltaPerSuccessful.add(appliedDeltaCount);
 
-//			if (isVisualizationEnabled) {
-//				visualizationStore.addState(childVersion, problem.getObjectiveValue().toString());
-//				visualizationStore.addTransition(version1, childVersion, Double.toString(1 - deltaSelectionRatio));
-//				visualizationStore.addTransition(version2, childVersion, Double.toString(deltaSelectionRatio));
-//			}
+			if (isVisualizationEnabled && totalCrossover > 50 && appliedDeltaCount >= 5) {
+				visualizationStore.addState(version1, "parent 1");
+				visualizationStore.addState(version2, "parent 2");
+				visualizationStore.addSolution(version1);
+				visualizationStore.addSolution(version2);
+				visualizationStore.addState(childVersion, "child");
+				visualizationStore.addSolution(childVersion);
+				visualizationStore.addTransition(version1, childVersion, Double.toString(1 - deltaSelectionRatio));
+				visualizationStore.addTransition(version2, childVersion, Double.toString(deltaSelectionRatio));
+			}
 
 			return new Solution[]{child};
 		}
@@ -182,6 +198,7 @@ public class DeltaCrossover implements Variation {
 		while (cursor.move()) {
 			Tuple key = cursor.getKey();
 			Object value = cursor.getValue();
+			//check exact value, multi-objects might also have a concrete number
 			if (value instanceof CardinalityInterval ci && !ci.isConcrete()) {
 				abstractIds.add(key.get(0));
 			}
@@ -209,6 +226,7 @@ public class DeltaCrossover implements Variation {
 			int limit = (int) (deltas.size() * deltaSelectionRatio);
 			var interpretation = castInterpretation(anyInterpretation);
 
+			appliedDeltaCount += limit;
 			for (int i = 0; i < limit; i++) {
 				var d = deltas.get(i);
 				interpretation.put(d.getKey(), d.getNewValue());
@@ -252,9 +270,10 @@ public class DeltaCrossover implements Variation {
 				continue;
 			}
 			else if(toAbstractIds.contains(id)) {
-				typeInterpretation.put(td.getKey(), td.getNewValue()); // works if we get diffs in the right order
+				typeInterpretation.put(td.getKey(), td.getNewValue()); // works since we get diffs in the right order
 			}
 			else if (shouldCrossoverNodes && random.nextDouble() < deltaSelectionRatio) {
+				appliedDeltaCount++;
 				typeInterpretation.put(td.getKey(), td.getNewValue());
 				if (checkIfTypeValueIsNull(td.getOldValue())) {
 					createdNodes.add(id);

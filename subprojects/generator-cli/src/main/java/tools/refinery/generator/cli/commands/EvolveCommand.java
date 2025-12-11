@@ -149,7 +149,7 @@ public class EvolveCommand implements Command {
 		generatorFactory.partialInterpretationBasedNeighborhoods(true);
 
 		var originalTime = time;
-		time = 1;
+		time = 0;
 		for(int i = 1; i<= 10; i++) {
 			runEvolutionaryAlgorithm(problem, crossoverRelations, minObjectiveRelations, maxObjectiveRelations,
 					violationRelations, i);
@@ -217,10 +217,14 @@ public class EvolveCommand implements Command {
 
 			algorithm.run(new MaxElapsedTime(Duration.ofSeconds(time)));
 
+			if(runNumber == 0) {
+				var visualizer = model.getAdapter(ModelVisualizerAdapter.class);
+				if (visualizer != null) visualizer.visualize(moeaProblem.getVisualizationStore());
+			}
 
 			//for measurements and visualization
 			try {
-				if(runNumber == 0) exportEvaluationRecords(moeaProblem, runNumber);
+				if(runNumber == 0) ;//exportEvaluationRecords(moeaProblem, runNumber);
 				else exportTimings(runNumber);
 			}
 			catch (Exception e) {
@@ -252,16 +256,16 @@ public class EvolveCommand implements Command {
 //			System.out.println(visualizationStore.getStates().size());
 				visualizationStore = new VisualizationStoreImpl();
 
-				var visualizer = model.getAdapter(ModelVisualizerAdapter.class);
-				if (visualizer != null) {
-					//visualizer.visualize(moeaProblem.getVisualizationStore());
-					for(int i = 0; i<result.size();i++) {
-						var versionVariable = (VersionVariable)result.get(i).getVariable(0);
-						visualizationStore.addState(versionVariable.getVersion(), versionVariable.getVersion().toString());
-						//visualizationStore.addSolution(versionVariable.getVersion());
-					}
-					visualizer.visualize(visualizationStore);
-				}
+//				var visualizer = model.getAdapter(ModelVisualizerAdapter.class);
+//				if (visualizer != null) {
+//					//visualizer.visualize(moeaProblem.getVisualizationStore());
+//					for(int i = 0; i<result.size();i++) {
+//						var versionVariable = (VersionVariable)result.get(i).getVariable(0);
+//						visualizationStore.addState(versionVariable.getVersion(), versionVariable.getVersion().toString());
+//						//visualizationStore.addSolution(versionVariable.getVersion());
+//					}
+//					visualizer.visualize(visualizationStore);
+//				}
 
 				for(int i = 0; i< result.size(); i++) {
 					Solution sol = result.get(i);
@@ -391,6 +395,27 @@ public class EvolveCommand implements Command {
 					totalCross + "," + successCross + "," + totalMut + "," + successMut + "," + totalEval + "," + successEval);
 			writer.newLine();
 		}
+
+		file = outDir.resolve("applied_deltas.csv");
+		var medianSuccess = getMedian(DeltaCrossover.deltaPerSuccessful);
+		var medianFailure = getMedian(DeltaCrossover.deltaPerFail);
+		try (BufferedWriter writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8,
+				java.nio.file.StandardOpenOption.CREATE,
+				append ? java.nio.file.StandardOpenOption.APPEND : java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)) {
+			if (!append) {
+				writer.write("delta_in_success, delta_in_failure");
+				writer.newLine();
+			}
+			writer.write(medianSuccess + "," + medianFailure);
+			writer.newLine();
+		}
+	}
+
+	private double getMedian(List<Integer> list) {
+		var sorted = list.stream().mapToInt(Integer::intValue).sorted().toArray();
+		return sorted.length % 2 == 0 ?
+				(sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2.0
+				: sorted[sorted.length / 2];
 	}
 
 	private void resetMetrics(RefineryProblem moeaProblem) {
