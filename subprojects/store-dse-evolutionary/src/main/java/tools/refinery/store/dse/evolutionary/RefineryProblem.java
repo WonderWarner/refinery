@@ -6,6 +6,8 @@ import org.moeaframework.core.constraint.LessThanOrEqual;
 import org.moeaframework.core.operator.Mutation;
 import org.moeaframework.core.operator.Variation;
 import org.moeaframework.problem.AbstractProblem;
+import tools.refinery.store.dse.evolutionary.objective.FunctionObjectiveEvaluator;
+import tools.refinery.store.dse.evolutionary.objective.ObjectiveEvaluator;
 import tools.refinery.store.dse.propagation.PropagationAdapter;
 import tools.refinery.store.dse.transition.DesignSpaceExplorationAdapter;
 import tools.refinery.store.map.Version;
@@ -128,7 +130,7 @@ public class RefineryProblem extends AbstractProblem {
     private final Version initialVersion;
     private final VisualizationStore visualizationStore;
     private final int randomizeDepth;
-	private int maxViolations = 10;
+	private double maxViolationCount = 10;
     private final DesignSpaceExplorationAdapter dseAdapter;
     private final @Nullable PropagationAdapter propagationAdapter;
     private final RuleBasedMutation ruleBasedMutation;
@@ -138,10 +140,20 @@ public class RefineryProblem extends AbstractProblem {
 	private final List<PartialInterpretation<?,?>> maxObjectiveInterpretations = new ArrayList<>();
 	private final List<PartialInterpretation<?,?>> violationInterpretations = new ArrayList<>();
 
-    public RefineryProblem(ModelStore store, Version initialVersion, List<PartialSymbol<?,?>> crossoverSymbols,
-						   List<PartialSymbol<?,?>> minObjectiveSymbols, List<PartialSymbol<?,?>> maxObjectiveSymbols,
-						   List<PartialSymbol<?,?>> violationSymbols, int randomizeDepth,
-						   boolean isVisualizationEnabled) {
+	private final ObjectiveEvaluator objectiveEvaluator;
+
+	public RefineryProblem(ModelStore store, Version initialVersion, List<PartialSymbol<?,?>> crossoverSymbols,
+	                       List<PartialSymbol<?,?>> minObjectiveSymbols, List<PartialSymbol<?,?>> maxObjectiveSymbols,
+	                       List<PartialSymbol<?,?>> violationSymbols, int randomizeDepth,
+	                       boolean isVisualizationEnabled) {
+		this(store, initialVersion, crossoverSymbols, minObjectiveSymbols, maxObjectiveSymbols, violationSymbols,
+				randomizeDepth, isVisualizationEnabled, new FunctionObjectiveEvaluator());
+	}
+
+	public RefineryProblem(ModelStore store, Version initialVersion, List<PartialSymbol<?,?>> crossoverSymbols,
+	                       List<PartialSymbol<?,?>> minObjectiveSymbols, List<PartialSymbol<?,?>> maxObjectiveSymbols,
+	                       List<PartialSymbol<?,?>> violationSymbols, int randomizeDepth,
+	                       boolean isVisualizationEnabled, ObjectiveEvaluator objectiveEvaluator) {
         super(1, minObjectiveSymbols.size()+maxObjectiveSymbols.size(), 1);
         if (randomizeDepth < 0) {
             throw new IllegalArgumentException("randomizeDepth must be positive or zero");
@@ -167,6 +179,7 @@ public class RefineryProblem extends AbstractProblem {
 			this.violationInterpretations.add(reasoningAdapter.getPartialInterpretation(Concreteness.CANDIDATE, violationSymbol));
 		}
 
+		this.objectiveEvaluator = objectiveEvaluator;
 		var selectedSymbols = toSymbols(store, crossoverSymbols);
 
 		ruleBasedMutation = new RuleBasedMutation(this);
@@ -204,23 +217,23 @@ public class RefineryProblem extends AbstractProblem {
         }
         model.restore(version);
 
-		int constraintCount = getConstraintCount();
-		if (constraintCount > maxViolations) {
+		double constraintValue = getConstraintValue();
+		if (constraintValue > maxViolationCount) {
 			setInfeasible(solution);
 			return;
 		}
 
         if (propagationAdapter != null && propagationAdapter.concretizationRequested()) {
             var concretizationResult = propagationAdapter.concretize();
-			constraintCount = getConstraintCount();
-            if (concretizationResult.isRejected() || constraintCount > maxViolations) {
+			constraintValue = getConstraintValue();
+            if (concretizationResult.isRejected() || constraintValue > maxViolationCount) {
                 setInfeasible(solution);
                 return;
             }
         }
 
 		setObjectiveValues(solution);
-		solution.setConstraintValue(0, constraintCount);
+		solution.setConstraintValue(0, constraintValue);
 
 		collectEvaluation(solution);
 
@@ -237,10 +250,10 @@ public class RefineryProblem extends AbstractProblem {
         solution.setConstraintValue(0, Double.POSITIVE_INFINITY);
     }
 
-	private int getConstraintCount() {
-		int totalViolations = 0;
+	private double getConstraintValue() {
+		double totalViolations = 0.0;
 		for (var violationInterpretation : violationInterpretations) {
-			totalViolations += countPred(violationInterpretation);
+			totalViolations += objectiveEvaluator.evaluate(violationInterpretation, model);
 		}
 		return totalViolations;
 	}
@@ -248,30 +261,21 @@ public class RefineryProblem extends AbstractProblem {
 	private void setObjectiveValues(Solution solution) {
 		int i = 0;
 		for (; i < minObjectiveInterpretations.size(); i++) {
-			int value = countPred(minObjectiveInterpretations.get(i));
+			double value = objectiveEvaluator.evaluate(minObjectiveInterpretations.get(i), model);
 			solution.setObjectiveValue(i, value);
 		}
 		for (int j = 0; j < maxObjectiveInterpretations.size(); j++) {
-			int value = countPred(maxObjectiveInterpretations.get(j));
+			double value = objectiveEvaluator.evaluate(maxObjectiveInterpretations.get(j), model);
 			value *= -1;
 			solution.setObjectiveValue(i+j, value);
 		}
-	}
-
-	private int countPred(PartialInterpretation<?,?> partialInterpretation) {
-		var cursor = partialInterpretation.getAll();
-		int count = 0;
-		while(cursor.move()) {
-			count++;
-		}
-		return count;
 	}
 
     @Override
     public Solution newSolution() {
         var solution = new Solution(numberOfVariables, numberOfObjectives, numberOfConstraints);
         solution.setVariable(0, new VersionVariable(this, initialVersion));
-        solution.setConstraint(0, new LessThanOrEqual(maxViolations));
+        solution.setConstraint(0, new LessThanOrEqual(maxViolationCount));
 
 //        if (visualizationStore != null) {
 //            visualizationStore.addState(getVersion(solution), dseAdapter.getObjectiveValue().toString());
@@ -320,8 +324,8 @@ public class RefineryProblem extends AbstractProblem {
 		deltaCrossover.setShouldCrossoverNodes(shouldCrossoverNodes);
 	}
 
-	public void setMaxViolations(int maxViolations) {
-		this.maxViolations = maxViolations;
+	public void setMaxViolationCount(double maxViolationCount) {
+		this.maxViolationCount = maxViolationCount;
 	}
 
 	public void setProbabilityOfCrossover(double probabilityOfCrossover) {

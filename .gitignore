@@ -24,6 +24,7 @@ bin/
 build/
 emf-gen/
 node_modules/
+test_output/
 xtend-gen/
 *.xtendbin
 xtext-gen/

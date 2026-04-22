@@ -31,15 +31,19 @@ pred trueFriends(SocialBeing sb1, SocialBeing sb2) <->
     friend(sb1, sb2),
     friend(sb2, sb1).
 
-@objective(true)
 pred ownerAndPetAreNotFriends(Person p, Dog d) <->
     pet(p, d),
     !trueFriends(p, d).
 
-% A Person is good to have at least 2 true friends
 @objective(true)
+int countOwnerAndPetAreNotFriends() = count{ownerAndPetAreNotFriends(_, _)}.
+
+% A Person is good to have at least 2 true friends
 pred notEnoughFriendsForPerson(Person p) <->
     !hasAtLeast2Friends(p, _, _).
+
+@objective(true)
+int countNotEnoughFriendsForPerson() = count{notEnoughFriendsForPerson(_)}.
 
 pred hasAtLeast2Friends(Person p, SocialBeing a1, SocialBeing a2) <->
     a1 != a2,
@@ -47,9 +51,11 @@ pred hasAtLeast2Friends(Person p, SocialBeing a1, SocialBeing a2) <->
     trueFriends(p, a2).
 
 % Friend triangles should be minimized / maximized
-@objective(false)
 pred beingInFriendTriangle(SocialBeing sb) <->
     friendTriangle(sb, _, _).
+
+@objective(false)
+int countBeingInFriendTriangle() = count{beingInFriendTriangle(_)}.
 
 pred friendTriangle(SocialBeing sb1, SocialBeing sb2, SocialBeing sb3) <->
     trueFriends(sb1, sb2),
@@ -57,15 +63,16 @@ pred friendTriangle(SocialBeing sb1, SocialBeing sb2, SocialBeing sb3) <->
     trueFriends(sb3, sb1).
 
 @objective(false)
-pred numberOfNodes(n) <->
-    node(n).
+int countNumberOfNodes() = count{node(_)}.
 
-@objective(true)
-@violation()
 pred violations(sb) <->
 	dogWithoutOwner(sb)
 ;
 	personWithMoreThan2Dogs(sb).
+
+@objective(true)
+@violation()
+int countOfViolations() = count{violations(_)}.
 
 pred dogWithoutOwner(Dog d) <->
     !pet(_, d).

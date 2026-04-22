@@ -21,6 +21,8 @@ import tools.refinery.store.dse.evolutionary.DeltaCrossover;
 import tools.refinery.store.dse.evolutionary.RefineryProblem;
 import tools.refinery.store.dse.evolutionary.RuleBasedMutation;
 import tools.refinery.store.dse.evolutionary.VersionVariable;
+import tools.refinery.store.dse.evolutionary.objective.ObjectiveEvalType;
+import tools.refinery.store.dse.evolutionary.objective.ObjectiveEvaluator;
 import tools.refinery.store.map.Version;
 import tools.refinery.store.model.Model;
 import tools.refinery.store.query.ModelQueryAdapter;
@@ -50,6 +52,7 @@ public class EvolveCommand implements Command {
 	private int randomizationDepth = 10;
 	private int time = 300;
 	private int maxViolations = 10;
+	private ObjectiveEvalType objEvalType = ObjectiveEvalType.FUNCTION;
 	private long randomSeed = 1;
 	private double deltaSelectionRatio = 0.3;
 	private double probabilityOfCrossover = 0.3;
@@ -96,6 +99,12 @@ public class EvolveCommand implements Command {
 	@Parameter(names = {"-max-violation", "-v"}, description = "Allowed violation count")
 	public void setMaxViolations(int maxViolations) {
 		this.maxViolations = maxViolations;
+	}
+
+	@Parameter(names = {"-obj-eval", "-oe"}, description =
+			"Objective evaluator: 0 - FUNCTION, 1 - PREDICATE")
+	public void setObjectiveEvaluator(ObjectiveEvalType objectiveEvaluatorType) {
+		this.objEvalType = objectiveEvaluatorType;
 	}
 
 	@Parameter(names = {"-delta-selection-percent", "-delta"}, description = "Delta selection percent of Crossover ")
@@ -181,30 +190,32 @@ public class EvolveCommand implements Command {
 			var maxObjectiveSymbols = new ArrayList<PartialSymbol<?,?>>();
 			var violationSymbols = new ArrayList<PartialSymbol<?,?>>();
 
+			ObjectiveEvaluator objEval = ObjectiveEvaluator.provideEvaluator(objEvalType);
+
 			for(var relation : crossoverRelations) {
 				crossoverSymbols.add(problemTrace.getPartialRelation(relation));
 			}
 			for(var relation : minObjectiveRelations) {
-				minObjectiveSymbols.add(problemTrace.getPartialRelation(relation));
+				objEval.AddPartialSymbolToSymbols(minObjectiveSymbols, problemTrace, relation);
 			}
 			for(var relation : maxObjectiveRelations) {
-				maxObjectiveSymbols.add(problemTrace.getPartialRelation(relation));
+				objEval.AddPartialSymbolToSymbols(maxObjectiveSymbols, problemTrace, relation);
 			}
 			for(var relation : violationRelations) {
-				violationSymbols.add(problemTrace.getPartialRelation(relation));
+				objEval.AddPartialSymbolToSymbols(violationSymbols, problemTrace, relation);
 			}
 
 			var initialVersion = model.commit();
 			queryEngine.flushChanges();
 
 			RefineryProblem moeaProblem = new RefineryProblem(store, initialVersion, crossoverSymbols,
-					minObjectiveSymbols, maxObjectiveSymbols, violationSymbols, randomizationDepth, true);
+					minObjectiveSymbols, maxObjectiveSymbols, violationSymbols, randomizationDepth, true, objEval);
 
 			moeaProblem.setDeltaSelectionRatio(deltaSelectionRatio);
 			moeaProblem.setRandomSeed(randomSeed);
 			moeaProblem.setShouldCrossoverNodes(shouldCrossoverNodes);
 			moeaProblem.setProbabilityOfCrossover(probabilityOfCrossover);
-			moeaProblem.setMaxViolations(maxViolations);
+			moeaProblem.setMaxViolationCount(maxViolations);
 
 			NSGAII algorithm = new NSGAII(moeaProblem);
 
